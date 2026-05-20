@@ -107,7 +107,22 @@ export default function Game() {
     setIsPlayer1(p1)
     setMyProfile(p1 ? roomData.player1 : roomData.player2)
     setOppProfile(p1 ? roomData.player2 : roomData.player1)
-    setQuestions(questionsBySubject[roomData.subject] || questionsBySubject.math)
+    const { data: dbQuestions } = await supabase
+  .from('questions')
+  .select('*')
+  .eq('subject', roomData.subject)
+  .order('random()')
+  .limit(5)
+
+if (dbQuestions && dbQuestions.length > 0) {
+  setQuestions(dbQuestions.map(q => ({
+    q: q.question,
+    answers: q.answers,
+    correct: q.correct_index,
+  })))
+} else {
+  setQuestions(questionsBySubject[roomData.subject] || questionsBySubject.math)
+}
 
     // Subscribe to room score updates
     supabase
