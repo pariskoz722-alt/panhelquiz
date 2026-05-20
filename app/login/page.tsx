@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { useTheme } from '../context/ThemeContext'
 
 export default function Login() {
   const [tab, setTab] = useState<'login' | 'register'>('login')
@@ -11,6 +12,18 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const { dark, toggleDark } = useTheme()
+
+  const c = {
+    bg: dark ? '#0A0E14' : '#f9fafb',
+    card: dark ? '#111827' : 'white',
+    cardBorder: dark ? 'rgba(255,255,255,0.08)' : '#e5e7eb',
+    text: dark ? '#fff' : '#111',
+    textSub: dark ? 'rgba(255,255,255,0.5)' : '#666',
+    inputBg: dark ? 'rgba(255,255,255,0.06)' : 'white',
+    inputBorder: dark ? 'rgba(255,255,255,0.12)' : '#e5e7eb',
+    tabBorder: dark ? 'rgba(255,255,255,0.08)' : '#e5e7eb',
+  }
 
   async function handleLogin() {
     setLoading(true); setError('')
@@ -38,14 +51,13 @@ export default function Login() {
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
         .input {
           width: 100%; padding: 11px 14px;
-          border: 1.5px solid #e5e7eb; border-radius: 10px;
-          font-family: inherit; font-size: 14px; color: #111;
-          background: white; transition: border-color 0.2s;
-          outline: none;
+          border-radius: 10px; font-family: inherit;
+          font-size: 14px; transition: border-color 0.2s; outline: none;
         }
-        .input:focus { border-color: #1D9E75; box-shadow: 0 0 0 3px #E1F5EE; }
+        .input:focus { border-color: #1D9E75; box-shadow: 0 0 0 3px rgba(29,158,117,0.15); }
         .btn {
-          width: 100%; padding: 13px; background: linear-gradient(135deg, #1D9E75, #0F6E56);
+          width: 100%; padding: 13px;
+          background: linear-gradient(135deg, #1D9E75, #0F6E56);
           color: white; border: none; border-radius: 12px;
           font-family: inherit; font-size: 15px; font-weight: 700;
           cursor: pointer; transition: all 0.2s;
@@ -53,30 +65,37 @@ export default function Login() {
         }
         .btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(29,158,117,0.4); }
         .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
-        .grade-btn {
-          flex: 1; padding: 12px 6px; border-radius: 10px; cursor: pointer;
-          border: 2px solid #e5e7eb; background: white; font-family: inherit;
-          transition: all 0.15s; text-align: center;
-        }
-        .grade-btn.selected { border-color: #1D9E75; background: #E1F5EE; }
+        .toggle-btn { transition: all 0.2s; cursor: pointer; }
+        .toggle-btn:hover { opacity: 0.8; }
         @media (max-width: 700px) {
           .auth-left { display: none !important; }
           .auth-right { border-radius: 16px !important; }
         }
       `}</style>
 
-      <main style={{ minHeight: '100vh', background: '#f9fafb', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-        <div style={{ display: 'flex', width: '100%', maxWidth: 820, background: 'white', borderRadius: 20, overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.1)', border: '1px solid #e5e7eb' }}>
+      <main style={{ minHeight: '100vh', background: c.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, transition: 'background 0.3s ease', flexDirection: 'column', gap: 16 }}>
+
+        {/* Toggle button top right */}
+        <div style={{ width: '100%', maxWidth: 820, display: 'flex', justifyContent: 'flex-end' }}>
+          <button className="toggle-btn" onClick={toggleDark} style={{
+            padding: '6px 12px', borderRadius: 20,
+            border: `1px solid ${c.cardBorder}`,
+            background: dark ? 'rgba(255,255,255,0.08)' : '#f3f4f6',
+            color: c.text, fontSize: 16, cursor: 'pointer',
+          }}>{dark ? '☀️' : '🌙'}</button>
+        </div>
+
+        <div style={{ display: 'flex', width: '100%', maxWidth: 820, background: c.card, borderRadius: 20, overflow: 'hidden', boxShadow: dark ? '0 20px 60px rgba(0,0,0,0.4)' : '0 20px 60px rgba(0,0,0,0.1)', border: `1px solid ${c.cardBorder}` }}>
 
           {/* Left */}
           <div className="auth-left" style={{ flex: 1, background: 'linear-gradient(160deg, #0F6E56, #1D9E75)', padding: '44px 36px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <div style={{ fontSize: 22, fontWeight: 800, color: 'white' }}>Panhel<span style={{ color: '#9FE1CB' }}>Quiz</span></div>
             <div>
-              <div style={{ fontSize: 28, fontWeight: 900, color: 'white', lineHeight: 1.2, marginBottom: 16 }}>Η γνώση<br/>είναι <span style={{ color: '#9FE1CB' }}>όπλο.</span></div>
+              <div style={{ fontSize: 28, fontWeight: 900, color: 'white', lineHeight: 1.2, marginBottom: 16 }}>Η γνώση<br />είναι <span style={{ color: '#9FE1CB' }}>όπλο.</span></div>
               <div style={{ fontSize: 14, color: '#5DCAA5', marginBottom: 24, lineHeight: 1.6 }}>Παίξε, μάθε, ανέβα. Μαζί με χιλιάδες μαθητές που προετοιμάζονται για τις Πανελλήνιες.</div>
               {['1v1 quiz battles σε πραγματικό χρόνο', 'Matchmaking ανά τάξη λυκείου', 'Εθνικό leaderboard ανά μάθημα', 'Δωρεάν για πάντα'].map(t => (
                 <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, fontSize: 13, color: '#9FE1CB' }}>
-                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#9FE1CB', flexShrink: 0 }}></div>{t}
+                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#9FE1CB', flexShrink: 0 }} />{t}
                 </div>
               ))}
             </div>
@@ -84,65 +103,79 @@ export default function Login() {
           </div>
 
           {/* Right */}
-          <div style={{ flex: 1, padding: '40px 36px' }}>
-            <div style={{ display: 'flex', borderBottom: '1px solid #e5e7eb', marginBottom: 28 }}>
+          <div className="auth-right" style={{ flex: 1, padding: '40px 36px', background: c.card }}>
+            <div style={{ display: 'flex', borderBottom: `1px solid ${c.tabBorder}`, marginBottom: 28 }}>
               {(['login', 'register'] as const).map(t => (
                 <button key={t} onClick={() => { setTab(t); setError(''); setSuccess('') }} style={{
                   flex: 1, padding: '10px', fontSize: 14, fontWeight: 600, cursor: 'pointer',
                   background: 'none', border: 'none', fontFamily: 'inherit',
-                  color: tab === t ? '#1D9E75' : '#666',
+                  color: tab === t ? '#1D9E75' : c.textSub,
                   borderBottom: tab === t ? '2px solid #1D9E75' : '2px solid transparent',
                 }}>{t === 'login' ? 'Σύνδεση' : 'Εγγραφή'}</button>
               ))}
             </div>
 
-            {error && <div style={{ background: '#FCEBEB', color: '#A32D2D', padding: '10px 14px', borderRadius: 10, fontSize: 13, marginBottom: 16 }}>⚠️ {error}</div>}
-            {success && <div style={{ background: '#E1F5EE', color: '#0F6E56', padding: '10px 14px', borderRadius: 10, fontSize: 13, marginBottom: 16 }}>✓ {success}</div>}
+            {error && <div style={{ background: dark ? 'rgba(163,45,45,0.2)' : '#FCEBEB', color: '#A32D2D', padding: '10px 14px', borderRadius: 10, fontSize: 13, marginBottom: 16 }}>⚠️ {error}</div>}
+            {success && <div style={{ background: dark ? 'rgba(29,158,117,0.2)' : '#E1F5EE', color: '#0F6E56', padding: '10px 14px', borderRadius: 10, fontSize: 13, marginBottom: 16 }}>✓ {success}</div>}
 
             {tab === 'login' ? (
               <div>
-                <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 4, color: '#111' }}>Καλώς ήρθες πίσω!</h2>
-                <p style={{ fontSize: 13, color: '#666', marginBottom: 22 }}>Σύνδεσε τον λογαριασμό σου.</p>
+                <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 4, color: c.text }}>Καλώς ήρθες πίσω!</h2>
+                <p style={{ fontSize: 13, color: c.textSub, marginBottom: 22 }}>Σύνδεσε τον λογαριασμό σου.</p>
                 <div style={{ marginBottom: 14 }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: '#666', display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Email</label>
-                  <input className="input" type="email" placeholder="maria@example.com" value={email} onChange={e => setEmail(e.target.value)} />
+                  <label style={{ fontSize: 12, fontWeight: 600, color: c.textSub, display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Email</label>
+                  <input className="input" type="email" placeholder="maria@example.com" value={email} onChange={e => setEmail(e.target.value)}
+                    style={{ background: c.inputBg, border: `1.5px solid ${c.inputBorder}`, color: c.text }} />
                 </div>
                 <div style={{ marginBottom: 20 }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: '#666', display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Κωδικός</label>
-                  <input className="input" type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} />
+                  <label style={{ fontSize: 12, fontWeight: 600, color: c.textSub, display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Κωδικός</label>
+                  <input className="input" type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)}
+                    style={{ background: c.inputBg, border: `1.5px solid ${c.inputBorder}`, color: c.text }} />
                 </div>
                 <button className="btn" onClick={handleLogin} disabled={loading}>{loading ? 'Σύνδεση...' : 'Σύνδεση'}</button>
-                <div style={{ textAlign: 'center', fontSize: 13, color: '#666', marginTop: 16 }}>Δεν έχεις λογαριασμό; <span onClick={() => setTab('register')} style={{ color: '#1D9E75', fontWeight: 600, cursor: 'pointer' }}>Εγγραφή</span></div>
+                <div style={{ textAlign: 'center', fontSize: 13, color: c.textSub, marginTop: 16 }}>
+                  Δεν έχεις λογαριασμό; <span onClick={() => setTab('register')} style={{ color: '#1D9E75', fontWeight: 600, cursor: 'pointer' }}>Εγγραφή</span>
+                </div>
               </div>
             ) : (
               <div>
-                <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 4, color: '#111' }}>Δημιούργησε λογαριασμό</h2>
-                <p style={{ fontSize: 13, color: '#666', marginBottom: 22 }}>Δωρεάν. Χωρίς πιστωτική κάρτα.</p>
+                <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 4, color: c.text }}>Δημιούργησε λογαριασμό</h2>
+                <p style={{ fontSize: 13, color: c.textSub, marginBottom: 22 }}>Δωρεάν. Χωρίς πιστωτική κάρτα.</p>
                 <div style={{ marginBottom: 14 }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: '#666', display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Όνομα</label>
-                  <input className="input" placeholder="Μαρία Παπαδοπούλου" value={name} onChange={e => setName(e.target.value)} />
+                  <label style={{ fontSize: 12, fontWeight: 600, color: c.textSub, display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Όνομα</label>
+                  <input className="input" placeholder="Μαρία Παπαδοπούλου" value={name} onChange={e => setName(e.target.value)}
+                    style={{ background: c.inputBg, border: `1.5px solid ${c.inputBorder}`, color: c.text }} />
                 </div>
                 <div style={{ marginBottom: 14 }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: '#666', display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Email</label>
-                  <input className="input" type="email" placeholder="maria@example.com" value={email} onChange={e => setEmail(e.target.value)} />
+                  <label style={{ fontSize: 12, fontWeight: 600, color: c.textSub, display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Email</label>
+                  <input className="input" type="email" placeholder="maria@example.com" value={email} onChange={e => setEmail(e.target.value)}
+                    style={{ background: c.inputBg, border: `1.5px solid ${c.inputBorder}`, color: c.text }} />
                 </div>
                 <div style={{ marginBottom: 14 }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: '#666', display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Κωδικός</label>
-                  <input className="input" type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} />
+                  <label style={{ fontSize: 12, fontWeight: 600, color: c.textSub, display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Κωδικός</label>
+                  <input className="input" type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)}
+                    style={{ background: c.inputBg, border: `1.5px solid ${c.inputBorder}`, color: c.text }} />
                 </div>
                 <div style={{ marginBottom: 22 }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: '#666', display: 'block', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Τάξη</label>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: c.textSub, display: 'block', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Τάξη</label>
                   <div style={{ display: 'flex', gap: 8 }}>
-                    {[1,2,3].map(g => (
-                      <button key={g} className={`grade-btn${grade===g?' selected':''}`} onClick={() => setGrade(g)}>
-                        <div style={{ fontSize: 18, fontWeight: 800, color: grade===g ? '#0F6E56' : '#111' }}>{['Α΄','Β΄','Γ΄'][g-1]}</div>
-                        <div style={{ fontSize: 11, color: '#888' }}>Λυκείου</div>
+                    {[1, 2, 3].map(g => (
+                      <button key={g} onClick={() => setGrade(g)} style={{
+                        flex: 1, padding: '12px 6px', borderRadius: 10, cursor: 'pointer',
+                        border: `2px solid ${grade === g ? '#1D9E75' : c.inputBorder}`,
+                        background: grade === g ? 'rgba(29,158,117,0.1)' : c.inputBg,
+                        fontFamily: 'inherit', textAlign: 'center', transition: 'all 0.15s',
+                      }}>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: grade === g ? '#1D9E75' : c.text }}>{['Α΄', 'Β΄', 'Γ΄'][g - 1]}</div>
+                        <div style={{ fontSize: 11, color: c.textSub }}>Λυκείου</div>
                       </button>
                     ))}
                   </div>
                 </div>
                 <button className="btn" onClick={handleRegister} disabled={loading}>{loading ? 'Δημιουργία...' : 'Δημιουργία λογαριασμού'}</button>
-                <div style={{ textAlign: 'center', fontSize: 13, color: '#666', marginTop: 16 }}>Έχεις ήδη λογαριασμό; <span onClick={() => setTab('login')} style={{ color: '#1D9E75', fontWeight: 600, cursor: 'pointer' }}>Σύνδεση</span></div>
+                <div style={{ textAlign: 'center', fontSize: 13, color: c.textSub, marginTop: 16 }}>
+                  Έχεις ήδη λογαριασμό; <span onClick={() => setTab('login')} style={{ color: '#1D9E75', fontWeight: 600, cursor: 'pointer' }}>Σύνδεση</span>
+                </div>
               </div>
             )}
           </div>
