@@ -38,9 +38,7 @@ export default function Lobby() {
     tagBg: dark ? 'rgba(29,158,117,0.15)' : '#E1F5EE',
   }
 
-  useEffect(() => {
-    loadProfile()
-  }, [])
+  useEffect(() => { loadProfile() }, [])
 
   useEffect(() => {
     if (screen !== 'matching') return
@@ -98,7 +96,25 @@ export default function Lobby() {
       if (newRoom) {
         setRoomId(newRoom.id)
 
-        const channel = supabase
+        // Polling - check every 1.5s if opponent joined
+        const pollInterval = setInterval(async () => {
+          const { data: roomCheck } = await supabase
+            .from('game_rooms')
+            .select('*, player2:profiles!game_rooms_player2_id_fkey(id, username, elo)')
+            .eq('id', newRoom.id)
+            .single()
+          if (roomCheck?.status === 'ready' && roomCheck?.player2_id) {
+            clearInterval(pollInterval)
+            setOpponent(roomCheck.player2)
+            setScreen('found')
+            setTimeout(() => {
+              window.location.href = `/game?room=${newRoom.id}`
+            }, 2000)
+          }
+        }, 1500)
+
+        // Also try realtime
+        supabase
           .channel(`room-${newRoom.id}`)
           .on('postgres_changes', {
             event: 'UPDATE',
@@ -107,6 +123,7 @@ export default function Lobby() {
             filter: `id=eq.${newRoom.id}`,
           }, async (payload) => {
             if (payload.new.status === 'ready' && payload.new.player2_id) {
+              clearInterval(pollInterval)
               const { data: opp } = await supabase
                 .from('profiles')
                 .select('id, username, elo')
@@ -114,7 +131,6 @@ export default function Lobby() {
                 .single()
               setOpponent(opp)
               setScreen('found')
-              channel.unsubscribe()
               setTimeout(() => {
                 window.location.href = `/game?room=${newRoom.id}`
               }, 2000)
@@ -141,9 +157,8 @@ export default function Lobby() {
         .grade-btn { flex: 1; padding: 16px 8px; border-radius: 14px; cursor: pointer; font-family: inherit; transition: all 0.2s; text-align: center; }
         .grade-btn:hover { transform: translateY(-2px); }
         .subject-btn { padding: 14px; border-radius: 14px; cursor: pointer; text-align: left; font-family: inherit; transition: all 0.2s; display: flex; align-items: center; gap: 10px; }
-        .subject-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .subject-btn:hover { transform: translateY(-2px); }
         .mode-btn { flex: 1; padding: 16px; border-radius: 14px; cursor: pointer; text-align: left; font-family: inherit; transition: all 0.2s; }
-        .mode-btn:hover { border-color: #1D9E75 !important; }
         .play-btn { width: 100%; padding: 16px; background: linear-gradient(135deg, #1D9E75, #0F6E56); color: white; border: none; border-radius: 14px; font-family: inherit; font-size: 17px; font-weight: 800; cursor: pointer; transition: all 0.2s; box-shadow: 0 6px 20px rgba(29,158,117,0.35); }
         .play-btn:hover { transform: translateY(-2px); }
         .searching-dot { width: 10px; height: 10px; border-radius: 50%; background: #1D9E75; animation: bounce 1.2s infinite; }
@@ -152,8 +167,6 @@ export default function Lobby() {
         @keyframes bounce { 0%,80%,100%{transform:scale(0.6);opacity:0.4} 40%{transform:scale(1.2);opacity:1} }
         .opp-avatar-appear { animation: popIn 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards; }
         @keyframes popIn { from{transform:scale(0);opacity:0} to{transform:scale(1);opacity:1} }
-        .start-btn { width: 100%; padding: 16px; background: linear-gradient(135deg, #1D9E75, #0F6E56); color: white; border: none; border-radius: 14px; font-family: inherit; font-size: 17px; font-weight: 800; cursor: pointer; text-decoration: none; display: block; text-align: center; animation: pulseBtn 1s ease infinite; box-shadow: 0 6px 20px rgba(29,158,117,0.4); }
-        @keyframes pulseBtn { 0%,100%{box-shadow:0 6px 20px rgba(29,158,117,0.4)} 50%{box-shadow:0 6px 30px rgba(29,158,117,0.7)} }
         .toggle-btn { transition: all 0.2s; cursor: pointer; }
         @media (max-width: 600px) {
           .subject-grid { grid-template-columns: 1fr !important; }
@@ -267,7 +280,6 @@ export default function Lobby() {
             <div style={{ fontSize: 36, marginBottom: 12 }}>🎯</div>
             <h2 style={{ fontSize: 24, fontWeight: 800, marginBottom: 6, color: c.text }}>Αντίπαλος βρέθηκε!</h2>
             <p style={{ fontSize: 14, color: c.textSub, marginBottom: 36 }}>Μεταφορά στο παιχνίδι σε 2 δευτερόλεπτα...</p>
-
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 24, marginBottom: 32 }}>
               <div style={{ textAlign: 'center' }}>
                 <div style={{ width: 70, height: 70, borderRadius: '50%', background: '#1D9E75', color: 'white', fontSize: 22, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 8px', border: '3px solid #0F6E56' }}>
@@ -285,9 +297,8 @@ export default function Lobby() {
                 <div style={{ fontSize: 12, color: c.textSub }}>ELO {opponent?.elo}</div>
               </div>
             </div>
-
-            <div style={{ background: c.tagBg, border: '1px solid #5DCAA5', borderRadius: 12, padding: '12px 20px', marginBottom: 20, fontSize: 14, fontWeight: 700, color: '#0F6E56' }}>
-              ✓ Αντίπαλος βρέθηκε! Μεταφορά...
+            <div style={{ background: c.tagBg, border: '1px solid #5DCAA5', borderRadius: 12, padding: '12px 20px', fontSize: 14, fontWeight: 700, color: '#0F6E56' }}>
+              ✓ Μεταφορά στο παιχνίδι...
             </div>
           </div>
         )}
