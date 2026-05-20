@@ -107,12 +107,16 @@ export default function Game() {
     setIsPlayer1(p1)
     setMyProfile(p1 ? roomData.player1 : roomData.player2)
     setOppProfile(p1 ? roomData.player2 : roomData.player1)
-    const { data: dbQuestions } = await supabase
+    const { data: allQuestions } = await supabase
   .from('questions')
   .select('*')
   .eq('subject', roomData.subject)
-  .order('random()')
-  .limit(5)
+
+const shuffled = (allQuestions || [])
+  .sort(() => Math.random() - 0.5)
+  .slice(0, 5)
+
+const dbQuestions = shuffled
 
 if (dbQuestions && dbQuestions.length > 0) {
   setQuestions(dbQuestions.map(q => ({
