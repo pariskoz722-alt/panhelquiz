@@ -265,10 +265,14 @@ export default function Home() {
         </div>
 
         {/* Footer */}
-        <div style={{ borderTop: `1px solid ${c.footerBorder}`, padding: '24px 32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-          <div style={{ fontSize: 16, fontWeight: 800, color: c.text }}>Panhel<span className="gradient-text">Quiz</span></div>
-          <div style={{ fontSize: 13, color: c.textMuted }}>© 2025 PanhelQuiz · Φτιαγμένο για Έλληνες μαθητές</div>
-        </div>
+<div style={{ borderTop: `1px solid ${c.footerBorder}`, padding: '24px 32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+  <div style={{ fontSize: 16, fontWeight: 800, color: c.text }}>Panhel<span className="gradient-text">Quiz</span></div>
+  <div style={{ display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap' }}>
+    <a href="/privacy" style={{ fontSize: 13, color: c.textSub, textDecoration: 'none' }}>Πολιτική Απορρήτου</a>
+    <a href="/privacy" style={{ fontSize: 13, color: c.textSub, textDecoration: 'none' }}>Cookies</a>
+    <span style={{ fontSize: 13, color: c.textMuted }}>© 2025 PanhelQuiz</span>
+  </div>
+</div>
 
       </main>
     </>
