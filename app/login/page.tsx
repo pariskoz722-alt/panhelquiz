@@ -12,6 +12,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [ageConfirmed, setAgeConfirmed] = useState(false)
   const { dark, toggleDark } = useTheme()
 
   const c = {
@@ -35,6 +36,11 @@ export default function Login() {
 
   async function handleRegister() {
     setLoading(true); setError('')
+    if (!ageConfirmed) {
+      setError('Πρέπει να επιβεβαιώσεις ότι είσαι 15+ ετών και να αποδεχτείς τους Όρους Χρήσης.')
+      setLoading(false)
+      return
+    }
     const { error } = await supabase.auth.signUp({
       email, password,
       options: { data: { name, grade } }
@@ -63,19 +69,17 @@ export default function Login() {
           cursor: pointer; transition: all 0.2s;
           box-shadow: 0 4px 15px rgba(29,158,117,0.3);
         }
-        .btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(29,158,117,0.4); }
+        .btn:hover { transform: translateY(-1px); }
         .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
         .toggle-btn { transition: all 0.2s; cursor: pointer; }
-        .toggle-btn:hover { opacity: 0.8; }
         @media (max-width: 700px) {
           .auth-left { display: none !important; }
           .auth-right { border-radius: 16px !important; }
         }
       `}</style>
 
-      <main style={{ minHeight: '100vh', background: c.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, transition: 'background 0.3s ease', flexDirection: 'column', gap: 16 }}>
+      <main style={{ minHeight: '100vh', background: c.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, flexDirection: 'column', gap: 16 }}>
 
-        {/* Toggle button top right */}
         <div style={{ width: '100%', maxWidth: 820, display: 'flex', justifyContent: 'flex-end' }}>
           <button className="toggle-btn" onClick={toggleDark} style={{
             padding: '6px 12px', borderRadius: 20,
@@ -156,7 +160,7 @@ export default function Login() {
                   <input className="input" type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)}
                     style={{ background: c.inputBg, border: `1.5px solid ${c.inputBorder}`, color: c.text }} />
                 </div>
-                <div style={{ marginBottom: 22 }}>
+                <div style={{ marginBottom: 14 }}>
                   <label style={{ fontSize: 12, fontWeight: 600, color: c.textSub, display: 'block', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Τάξη</label>
                   <div style={{ display: 'flex', gap: 8 }}>
                     {[1, 2, 3].map(g => (
@@ -164,7 +168,7 @@ export default function Login() {
                         flex: 1, padding: '12px 6px', borderRadius: 10, cursor: 'pointer',
                         border: `2px solid ${grade === g ? '#1D9E75' : c.inputBorder}`,
                         background: grade === g ? 'rgba(29,158,117,0.1)' : c.inputBg,
-                        fontFamily: 'inherit', textAlign: 'center', transition: 'all 0.15s',
+                        fontFamily: 'inherit', textAlign: 'center',
                       }}>
                         <div style={{ fontSize: 18, fontWeight: 800, color: grade === g ? '#1D9E75' : c.text }}>{['Α΄', 'Β΄', 'Γ΄'][g - 1]}</div>
                         <div style={{ fontSize: 11, color: c.textSub }}>Λυκείου</div>
@@ -172,6 +176,25 @@ export default function Login() {
                     ))}
                   </div>
                 </div>
+
+                {/* Ηλικιακή επαλήθευση */}
+                <div style={{ marginBottom: 20 }}>
+                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={ageConfirmed}
+                      onChange={e => setAgeConfirmed(e.target.checked)}
+                      style={{ marginTop: 3, width: 16, height: 16, accentColor: '#1D9E75', flexShrink: 0 }}
+                    />
+                    <span style={{ fontSize: 13, color: c.textSub, lineHeight: 1.5 }}>
+                      Επιβεβαιώνω ότι είμαι τουλάχιστον <strong style={{ color: c.text }}>15 ετών</strong> και αποδέχομαι τους{' '}
+                      <a href="/terms" style={{ color: '#1D9E75', fontWeight: 600 }}>Όρους Χρήσης</a>{' '}
+                      και την{' '}
+                      <a href="/privacy" style={{ color: '#1D9E75', fontWeight: 600 }}>Πολιτική Απορρήτου</a>.
+                    </span>
+                  </label>
+                </div>
+
                 <button className="btn" onClick={handleRegister} disabled={loading}>{loading ? 'Δημιουργία...' : 'Δημιουργία λογαριασμού'}</button>
                 <div style={{ textAlign: 'center', fontSize: 13, color: c.textSub, marginTop: 16 }}>
                   Έχεις ήδη λογαριασμό; <span onClick={() => setTab('login')} style={{ color: '#1D9E75', fontWeight: 600, cursor: 'pointer' }}>Σύνδεση</span>
