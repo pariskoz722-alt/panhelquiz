@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';import { useTheme } from '../context/ThemeContext'
 
 const mockStats = {
   username: 'alex_student',
@@ -44,7 +44,7 @@ export default function ProfilePage() {
   const [username, setUsername] = useState(mockStats.username);
   const [selectedClass, setSelectedClass] = useState(mockStats.class);
   const [saved, setSaved] = useState(false);
-  const [dark, setDark] = useState(false);
+  const { dark, toggleDark } = useTheme()
 
   const c = {
     bg: dark ? 'linear-gradient(135deg, #0A0E14 0%, #0D1A15 50%, #0A0E14 100%)' : '#f9fafb',
@@ -66,6 +66,10 @@ export default function ProfilePage() {
   useEffect(() => {
     setTimeout(() => setVisible(true), 50);
   }, []);
+
+  function setDark(arg0: boolean): void {
+    throw new Error('Function not implemented.');
+  }
 
   return (
     <>

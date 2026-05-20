@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';import { useTheme } from '../context/ThemeContext'
 
 const SUBJECTS = ['Όλα', 'Μαθηματικά', 'Φυσική', 'Χημεία', 'Βιολογία', 'Ιστορία', 'Έκθεση', 'Λογοτεχνία'];
 const CLASSES = ['Όλες', "Α' Λυκείου", "Β' Λυκείου", "Γ' Λυκείου"];
@@ -23,7 +23,7 @@ export default function LeaderboardPage() {
   const [selectedClass, setSelectedClass] = useState('Όλες');
   const [visible, setVisible] = useState(false);
   const [rowsVisible, setRowsVisible] = useState<boolean[]>([]);
-  const [dark, setDark] = useState(false);
+  const { dark, toggleDark } = useTheme()
 
   const c = {
     bg: dark ? '#0A0E14' : '#f9fafb',
@@ -106,7 +106,7 @@ export default function LeaderboardPage() {
             }}>{link.label}</a>
           ))}
           {/* Dark/Light Toggle */}
-          <button className="toggle-btn" onClick={() => setDark(!dark)} style={{
+          <button className="toggle-btn" onClick={toggleDark} style={{
             marginLeft: 8, padding: '6px 12px', borderRadius: 20,
             border: `1px solid ${c.cardBorder}`,
             background: dark ? 'rgba(255,255,255,0.08)' : '#f3f4f6',
