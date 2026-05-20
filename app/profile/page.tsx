@@ -68,8 +68,8 @@ export default function ProfilePage() {
   }, []);
 
   function setDark(arg0: boolean): void {
-    throw new Error('Function not implemented.');
-  }
+  throw new Error('Function not implemented.');
+}
 
   return (
     <>
