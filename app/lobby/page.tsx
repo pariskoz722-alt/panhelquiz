@@ -53,7 +53,7 @@ export default function Lobby() {
     const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
     setProfile(data)
     if (data?.grade) setGrade(data.grade)
-  }
+  await supabase.rpc('cleanup_old_rooms')}
 
   async function findMatch() {
     if (!profile) return
