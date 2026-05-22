@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useTheme } from '../context/ThemeContext'
 import { supabase } from '../lib/supabase'
 
@@ -48,6 +48,16 @@ const questionsBySubject: Record<string, { q: string; answers: string[]; correct
   ],
 }
 
+const QUICK_REACTIONS = ['👏', '🔥', '😤', '🤝', '💪', '😂']
+
+interface ChatMessage {
+  id: string
+  player_id: string
+  username: string
+  message: string
+  created_at: string
+}
+
 export default function Game() {
   const [phase, setPhase] = useState<'countdown' | 'game' | 'results'>('countdown')
   const [countdown, setCountdown] = useState(3)
@@ -64,6 +74,16 @@ export default function Game() {
   const [oppProfile, setOppProfile] = useState<any>(null)
   const [isPlayer1, setIsPlayer1] = useState(false)
   const [questions, setQuestions] = useState(questionsBySubject.math)
+
+  // Chat state
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
+  const [chatInput, setChatInput] = useState('')
+  const [chatExpired, setChatExpired] = useState(false)
+  const [chatTimeLeft, setChatTimeLeft] = useState(300) // 5 λεπτά
+  const chatBottomRef = useRef<HTMLDivElement>(null)
+  const currentRoomRef = useRef<any>(null)
+  const myProfileRef = useRef<any>(null)
+
   const { dark, toggleDark } = useTheme()
 
   const c = {
@@ -79,6 +99,10 @@ export default function Game() {
     ansBorder: dark ? 'rgba(255,255,255,0.12)' : '#e5e7eb',
     tagBg: dark ? 'rgba(255,255,255,0.08)' : '#f3f4f6',
     progressBg: dark ? 'rgba(255,255,255,0.08)' : '#e5e7eb',
+    chatBg: dark ? 'rgba(255,255,255,0.03)' : '#f3f4f6',
+    chatInputBg: dark ? 'rgba(255,255,255,0.06)' : 'white',
+    myMsgBg: dark ? 'rgba(29,158,117,0.25)' : '#E1F5EE',
+    oppMsgBg: dark ? 'rgba(255,255,255,0.08)' : 'white',
   }
 
   useEffect(() => {
@@ -91,61 +115,107 @@ export default function Game() {
 
     const params = new URLSearchParams(window.location.search)
     const roomId = params.get('room')
-
     if (!roomId) { window.location.href = '/lobby'; return }
 
     const { data: roomData } = await supabase
       .from('game_rooms')
-      .select('*, player1:profiles!game_rooms_player1_id_fkey(id, username, elo), player2:profiles!game_rooms_player2_id_fkey(id, username, elo)')
+      .select('*, player1:profiles!game_rooms_player1_id_fkey(id, username, elo, wins, losses), player2:profiles!game_rooms_player2_id_fkey(id, username, elo, wins, losses)')
       .eq('id', roomId)
       .single()
 
     if (!roomData) { window.location.href = '/lobby'; return }
 
     setRoom(roomData)
+    currentRoomRef.current = roomData
     const p1 = roomData.player1_id === user.id
     setIsPlayer1(p1)
-    setMyProfile(p1 ? roomData.player1 : roomData.player2)
-    setOppProfile(p1 ? roomData.player2 : roomData.player1)
+    const me = p1 ? roomData.player1 : roomData.player2
+    const opp = p1 ? roomData.player2 : roomData.player1
+    setMyProfile(me)
+    myProfileRef.current = me
+    setOppProfile(opp)
+
     const { data: allQuestions } = await supabase
-  .from('questions')
-  .select('*')
-  .eq('subject', roomData.subject)
+      .from('questions')
+      .select('*')
+      .eq('subject', roomData.subject)
 
-const shuffled = (allQuestions || [])
-  .sort(() => Math.random() - 0.5)
-  .slice(0, 5)
+    const shuffled = (allQuestions || []).sort(() => Math.random() - 0.5).slice(0, 5)
+    if (shuffled.length > 0) {
+      setQuestions(shuffled.map(q => ({ q: q.question, answers: q.answers, correct: q.correct_index })))
+    } else {
+      setQuestions(questionsBySubject[roomData.subject] || questionsBySubject.math)
+    }
 
-const dbQuestions = shuffled
-
-if (dbQuestions && dbQuestions.length > 0) {
-  setQuestions(dbQuestions.map(q => ({
-    q: q.question,
-    answers: q.answers,
-    correct: q.correct_index,
-  })))
-} else {
-  setQuestions(questionsBySubject[roomData.subject] || questionsBySubject.math)
-}
-
-    // Subscribe to room score updates
     supabase
       .channel(`game-${roomId}`)
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'game_rooms',
-        filter: `id=eq.${roomId}`,
-      }, (payload) => {
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'game_rooms', filter: `id=eq.${roomId}` }, (payload) => {
         const newRoom = payload.new
-const oppScore = p1 ? newRoom.score_p2 : newRoom.score_p1
-setScoreOpp(oppScore)
-setOppCorrect(Math.round(oppScore / 120))
-if (newRoom.status === 'finished') {
-  setPhase('results')
-}
+        const oppScore = p1 ? newRoom.score_p2 : newRoom.score_p1
+        setScoreOpp(oppScore)
+        setOppCorrect(Math.round(oppScore / 120))
+        if (newRoom.status === 'finished') setPhase('results')
       })
       .subscribe()
+  }
+
+  // Chat realtime subscription
+  useEffect(() => {
+    if (phase !== 'results' || !currentRoomRef.current) return
+
+    const roomId = currentRoomRef.current.id
+
+    // Load existing messages
+    supabase
+      .from('chat_messages')
+      .select('*')
+      .eq('room_id', roomId)
+      .order('created_at', { ascending: true })
+      .then(({ data }) => { if (data) setChatMessages(data) })
+
+    // Subscribe to new messages
+    const channel = supabase
+      .channel(`chat-${roomId}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: `room_id=eq.${roomId}` }, (payload) => {
+        setChatMessages(prev => [...prev, payload.new as ChatMessage])
+      })
+      .subscribe()
+
+    // 5 λεπτά countdown
+    const timer = setInterval(() => {
+      setChatTimeLeft(prev => {
+        if (prev <= 1) { setChatExpired(true); clearInterval(timer); return 0 }
+        return prev - 1
+      })
+    }, 1000)
+
+    return () => {
+      supabase.removeChannel(channel)
+      clearInterval(timer)
+    }
+  }, [phase])
+
+  // Auto-scroll chat
+  useEffect(() => {
+    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [chatMessages])
+
+  async function sendMessage(text: string) {
+    if (!text.trim() || chatExpired || !currentRoomRef.current || !myProfileRef.current) return
+    const { error } = await supabase.from('chat_messages').insert({
+      room_id: currentRoomRef.current.id,
+      player_id: myProfileRef.current.id,
+      username: myProfileRef.current.username,
+      message: text.trim(),
+    })
+    if (!error) setChatInput('')
+  }
+
+  function handleChatKey(e: React.KeyboardEvent) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      sendMessage(chatInput)
+    }
   }
 
   useEffect(() => {
@@ -163,31 +233,29 @@ if (newRoom.status === 'finished') {
   }, [phase, time, selected])
 
   async function updateRoomScore(newScore: number) {
-    if (!room) return
+    if (!currentRoomRef.current) return
     const field = isPlayer1 ? 'score_p1' : 'score_p2'
-    await supabase
-      .from('game_rooms')
-      .update({ [field]: newScore })
-      .eq('id', room.id)
+    await supabase.from('game_rooms').update({ [field]: newScore }).eq('id', currentRoomRef.current.id)
   }
 
   async function finishGame(finalScoreYou: number, finalScoreOpp: number) {
-    if (!room || !myProfile) return
+    if (!currentRoomRef.current || !myProfileRef.current) return
     const iWon = finalScoreYou > finalScoreOpp
     const eloChange = iWon ? 18 : -14
+    const me = myProfileRef.current
+    const opp = oppProfile
 
-    await supabase.from('game_rooms').update({ status: 'finished' }).eq('id', room.id)
+    await supabase.from('game_rooms').update({ status: 'finished' }).eq('id', currentRoomRef.current.id)
     await supabase.from('profiles').update({
-      elo: myProfile.elo + eloChange,
-      wins: iWon ? myProfile.wins + 1 : myProfile.wins,
-      losses: iWon ? myProfile.losses : myProfile.losses + 1,
-    }).eq('id', myProfile.id)
-
+      elo: me.elo + eloChange,
+      wins: iWon ? me.wins + 1 : me.wins,
+      losses: iWon ? me.losses : me.losses + 1,
+    }).eq('id', me.id)
     await supabase.from('games').insert({
-      player1_id: room.player1_id,
-      player2_id: room.player2_id,
-      winner_id: iWon ? myProfile.id : oppProfile?.id,
-      subject: room.subject,
+      player1_id: currentRoomRef.current.player1_id,
+      player2_id: currentRoomRef.current.player2_id,
+      winner_id: iWon ? me.id : opp?.id,
+      subject: currentRoomRef.current.subject,
       score_p1: isPlayer1 ? finalScoreYou : finalScoreOpp,
       score_p2: isPlayer1 ? finalScoreOpp : finalScoreYou,
       elo_change: Math.abs(eloChange),
@@ -201,11 +269,7 @@ if (newRoom.status === 'finished') {
     const isCorrect = i === correct
     const pts = isCorrect ? Math.round(100 + time * 5) : 0
     const newScore = scoreYou + pts
-    if (isCorrect) {
-      setScoreYou(newScore)
-      setYouCorrect(c => c + 1)
-      updateRoomScore(newScore)
-    }
+    if (isCorrect) { setScoreYou(newScore); setYouCorrect(c => c + 1); updateRoomScore(newScore) }
     setFeedback(isCorrect ? 'correct' : 'wrong')
     setTimeout(() => nextQ(newScore), 1600)
   }
@@ -217,20 +281,16 @@ if (newRoom.status === 'finished') {
   }
 
   function nextQ(currentScore: number) {
-    if (cur + 1 >= questions.length) {
-      setPhase('results')
-      finishGame(currentScore, scoreOpp)
-      return
-    }
-    setCur(c => c + 1)
-    setSelected(null)
-    setFeedback(null)
-    setTime(15)
+    if (cur + 1 >= questions.length) { setPhase('results'); finishGame(currentScore, scoreOpp); return }
+    setCur(c => c + 1); setSelected(null); setFeedback(null); setTime(15)
   }
 
   const timerPct = time / 15
   const timerColor = time <= 5 ? '#E24B4A' : '#1D9E75'
   const circumference = 125.6
+
+  const chatMinutes = Math.floor(chatTimeLeft / 60)
+  const chatSeconds = chatTimeLeft % 60
 
   return (
     <>
@@ -256,6 +316,12 @@ if (newRoom.status === 'finished') {
         .result-icon { font-size: 56px; animation: bounceIn 0.5s cubic-bezier(0.34,1.56,0.64,1); }
         @keyframes bounceIn { from{transform:scale(0)} to{transform:scale(1)} }
         .toggle-btn { transition: all 0.2s; cursor: pointer; }
+        .chat-msg { animation: msgIn 0.25s ease; }
+        @keyframes msgIn { from{transform:translateY(6px);opacity:0} to{transform:translateY(0);opacity:1} }
+        .reaction-btn:hover { transform: scale(1.25); }
+        .reaction-btn { transition: transform 0.15s; cursor: pointer; background: none; border: none; font-size: 22px; padding: 4px; }
+        .send-btn:hover { background: #0F6E56 !important; }
+        .send-btn { transition: background 0.15s; }
         @media (max-width: 600px) { .answers-grid { grid-template-columns: 1fr !important; } }
       `}</style>
 
@@ -370,32 +436,110 @@ if (newRoom.status === 'finished') {
 
         {/* RESULTS */}
         {phase === 'results' && (
-          <div style={{ maxWidth: 480, margin: '0 auto', padding: '40px 20px', textAlign: 'center' }}>
-            <div className="result-icon">{scoreYou > scoreOpp ? '🏆' : scoreYou < scoreOpp ? '😤' : '🤝'}</div>
-            <h2 style={{ fontSize: 28, fontWeight: 900, color: c.text, margin: '12px 0 4px' }}>
-              {scoreYou > scoreOpp ? 'Νίκησες!' : scoreYou < scoreOpp ? 'Ηττήθηκες!' : 'Ισοπαλία!'}
-            </h2>
-            <p style={{ fontSize: 14, color: c.textSub, marginBottom: 28 }}>
-              {scoreYou > scoreOpp ? 'Φοβερή παρτίδα!' : 'Επόμενη φορά!'}
-            </p>
-            <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginBottom: 20 }}>
-              {[
-                { label: myProfile?.username || 'Εσύ', pts: scoreYou, correct: youCorrect, color: '#1D9E75', bg: dark ? 'rgba(29,158,117,0.15)' : '#E1F5EE' },
-                { label: oppProfile?.username || 'Αντίπαλος', pts: scoreOpp, correct: oppCorrect, color: '#185FA5', bg: dark ? 'rgba(24,95,165,0.15)' : '#E6F1FB' }
-              ].map(p => (
-                <div key={p.label} style={{ flex: 1, maxWidth: 160, background: p.bg, border: `1px solid ${p.color}33`, borderRadius: 16, padding: '20px 16px' }}>
-                  <div style={{ fontSize: 13, color: c.textSub, marginBottom: 6 }}>{p.label}</div>
-                  <div style={{ fontSize: 36, fontWeight: 900, color: p.color }}>{p.pts}</div>
-                  <div style={{ fontSize: 12, color: c.textMuted, marginTop: 4 }}>{p.correct}/5 σωστά</div>
+          <div style={{ maxWidth: 480, margin: '0 auto', padding: '40px 20px 60px' }}>
+            <div style={{ textAlign: 'center' }}>
+              <div className="result-icon">{scoreYou > scoreOpp ? '🏆' : scoreYou < scoreOpp ? '😤' : '🤝'}</div>
+              <h2 style={{ fontSize: 28, fontWeight: 900, color: c.text, margin: '12px 0 4px' }}>
+                {scoreYou > scoreOpp ? 'Νίκησες!' : scoreYou < scoreOpp ? 'Ηττήθηκες!' : 'Ισοπαλία!'}
+              </h2>
+              <p style={{ fontSize: 14, color: c.textSub, marginBottom: 28 }}>
+                {scoreYou > scoreOpp ? 'Φοβερή παρτίδα!' : 'Επόμενη φορά!'}
+              </p>
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginBottom: 20 }}>
+                {[
+                  { label: myProfile?.username || 'Εσύ', pts: scoreYou, correct: youCorrect, color: '#1D9E75', bg: dark ? 'rgba(29,158,117,0.15)' : '#E1F5EE' },
+                  { label: oppProfile?.username || 'Αντίπαλος', pts: scoreOpp, correct: oppCorrect, color: '#185FA5', bg: dark ? 'rgba(24,95,165,0.15)' : '#E6F1FB' }
+                ].map(p => (
+                  <div key={p.label} style={{ flex: 1, maxWidth: 160, background: p.bg, border: `1px solid ${p.color}33`, borderRadius: 16, padding: '20px 16px' }}>
+                    <div style={{ fontSize: 13, color: c.textSub, marginBottom: 6 }}>{p.label}</div>
+                    <div style={{ fontSize: 36, fontWeight: 900, color: p.color }}>{p.pts}</div>
+                    <div style={{ fontSize: 12, color: c.textMuted, marginTop: 4 }}>{p.correct}/5 σωστά</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ background: scoreYou >= scoreOpp ? (dark ? 'rgba(29,158,117,0.15)' : '#E1F5EE') : (dark ? 'rgba(163,45,45,0.15)' : '#FCEBEB'), border: `1px solid ${scoreYou >= scoreOpp ? '#5DCAA5' : '#F09595'}`, borderRadius: 12, padding: '12px 20px', marginBottom: 24, fontSize: 15, fontWeight: 700, color: scoreYou >= scoreOpp ? '#0F6E56' : '#A32D2D' }}>
+                {scoreYou > scoreOpp ? '📈 +18 ELO' : scoreYou < scoreOpp ? '📉 -14 ELO' : '➡️ ±0 ELO'}
+              </div>
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginBottom: 32 }}>
+                <a href="/lobby" style={{ flex: 1, padding: '14px', background: 'linear-gradient(135deg, #1D9E75, #0F6E56)', color: 'white', borderRadius: 12, fontSize: 15, fontWeight: 800, textDecoration: 'none', textAlign: 'center' }}>▶ Νέα παρτίδα</a>
+                <a href="/dashboard" style={{ padding: '14px 20px', background: c.card, color: c.textSub, border: `1px solid ${c.cardBorder}`, borderRadius: 12, fontSize: 15, textDecoration: 'none', fontWeight: 500 }}>Dashboard</a>
+              </div>
+            </div>
+
+            {/* POST-GAME CHAT */}
+            <div style={{ background: c.card, border: `1px solid ${c.cardBorder}`, borderRadius: 20, overflow: 'hidden' }}>
+              {/* Chat header */}
+              <div style={{ padding: '14px 16px', borderBottom: `1px solid ${c.cardBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 16 }}>💬</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: c.text }}>Post-game chat</span>
                 </div>
-              ))}
-            </div>
-            <div style={{ background: scoreYou >= scoreOpp ? (dark ? 'rgba(29,158,117,0.15)' : '#E1F5EE') : (dark ? 'rgba(163,45,45,0.15)' : '#FCEBEB'), border: `1px solid ${scoreYou >= scoreOpp ? '#5DCAA5' : '#F09595'}`, borderRadius: 12, padding: '12px 20px', marginBottom: 24, fontSize: 15, fontWeight: 700, color: scoreYou >= scoreOpp ? '#0F6E56' : '#A32D2D' }}>
-              {scoreYou > scoreOpp ? '📈 +18 ELO' : scoreYou < scoreOpp ? '📉 -14 ELO' : '➡️ ±0 ELO'}
-            </div>
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
-              <a href="/lobby" style={{ flex: 1, padding: '14px', background: 'linear-gradient(135deg, #1D9E75, #0F6E56)', color: 'white', borderRadius: 12, fontSize: 15, fontWeight: 800, textDecoration: 'none', textAlign: 'center' }}>▶ Νέα παρτίδα</a>
-              <a href="/dashboard" style={{ padding: '14px 20px', background: c.card, color: c.textSub, border: `1px solid ${c.cardBorder}`, borderRadius: 12, fontSize: 15, textDecoration: 'none', fontWeight: 500 }}>Dashboard</a>
+                {!chatExpired ? (
+                  <span style={{ fontSize: 12, color: c.textMuted, background: c.tagBg, padding: '3px 10px', borderRadius: 20 }}>
+                    {chatMinutes}:{chatSeconds.toString().padStart(2, '0')}
+                  </span>
+                ) : (
+                  <span style={{ fontSize: 12, color: '#E24B4A', background: dark ? 'rgba(226,75,74,0.1)' : '#FCEBEB', padding: '3px 10px', borderRadius: 20 }}>Έληξε</span>
+                )}
+              </div>
+
+              {/* Quick reactions */}
+              {!chatExpired && (
+                <div style={{ padding: '10px 16px', borderBottom: `1px solid ${c.cardBorder}`, display: 'flex', gap: 4 }}>
+                  {QUICK_REACTIONS.map(emoji => (
+                    <button key={emoji} className="reaction-btn" onClick={() => sendMessage(emoji)}>{emoji}</button>
+                  ))}
+                </div>
+              )}
+
+              {/* Messages */}
+              <div style={{ height: 220, overflowY: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 8, background: c.chatBg }}>
+                {chatMessages.length === 0 && (
+                  <div style={{ textAlign: 'center', color: c.textMuted, fontSize: 13, marginTop: 'auto', marginBottom: 'auto' }}>
+                    Πες gg! 👋
+                  </div>
+                )}
+                {chatMessages.map(msg => {
+                  const isMe = msg.player_id === myProfileRef.current?.id
+                  return (
+                    <div key={msg.id} className="chat-msg" style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
+                      <div style={{ fontSize: 11, color: c.textMuted, marginBottom: 3, paddingLeft: isMe ? 0 : 4, paddingRight: isMe ? 4 : 0 }}>
+                        {msg.username}
+                      </div>
+                      <div style={{ background: isMe ? c.myMsgBg : c.oppMsgBg, border: `1px solid ${isMe ? '#1D9E7533' : c.cardBorder}`, borderRadius: isMe ? '16px 16px 4px 16px' : '16px 16px 16px 4px', padding: '8px 12px', maxWidth: '75%', fontSize: 14, color: c.text, wordBreak: 'break-word' }}>
+                        {msg.message}
+                      </div>
+                    </div>
+                  )
+                })}
+                <div ref={chatBottomRef} />
+              </div>
+
+              {/* Input */}
+              {!chatExpired ? (
+                <div style={{ padding: '12px 16px', display: 'flex', gap: 8, borderTop: `1px solid ${c.cardBorder}` }}>
+                  <input
+                    value={chatInput}
+                    onChange={e => setChatInput(e.target.value)}
+                    onKeyDown={handleChatKey}
+                    placeholder="Γράψε κάτι..."
+                    maxLength={200}
+                    style={{ flex: 1, padding: '10px 14px', borderRadius: 12, border: `1px solid ${c.cardBorder}`, background: c.chatInputBg, color: c.text, fontSize: 14, fontFamily: 'inherit', outline: 'none' }}
+                  />
+                  <button
+                    className="send-btn"
+                    onClick={() => sendMessage(chatInput)}
+                    disabled={!chatInput.trim()}
+                    style={{ padding: '10px 16px', background: '#1D9E75', color: 'white', border: 'none', borderRadius: 12, fontSize: 14, fontWeight: 700, cursor: chatInput.trim() ? 'pointer' : 'not-allowed', opacity: chatInput.trim() ? 1 : 0.5 }}
+                  >
+                    ↑
+                  </button>
+                </div>
+              ) : (
+                <div style={{ padding: '14px 16px', textAlign: 'center', fontSize: 13, color: c.textMuted }}>
+                  Το chat έκλεισε. Καλή συνέχεια! 🎯
+                </div>
+              )}
             </div>
           </div>
         )}
