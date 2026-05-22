@@ -91,20 +91,23 @@ export default function Lobby() {
     }
   } else {
     // Είμαστε player1 — περιμένουμε player2
-    const pollInterval = setInterval(async () => {
-      const { data: roomCheck } = await supabase
-        .from('game_rooms')
-        .select('*, player2:profiles!game_rooms_player2_id_fkey(id, username, elo)')
-        .eq('id', room_id)
-        .single()
+    let stopped = false
+const pollInterval = setInterval(async () => {
+  if (stopped) return
+  const { data: roomCheck } = await supabase
+    .from('game_rooms')
+    .select('*, player2:profiles!game_rooms_player2_id_fkey(id, username, elo)')
+    .eq('id', room_id)
+    .single()
 
-      if (roomCheck?.status === 'ready' && roomCheck?.player2_id) {
-        clearInterval(pollInterval)
-        setOpponent(roomCheck.player2)
-        setScreen('found')
-        setTimeout(() => { window.location.href = `/game?room=${room_id}` }, 2000)
-      }
-    }, 1500)
+  if (roomCheck?.status === 'ready' && roomCheck?.player2_id) {
+    stopped = true
+    clearInterval(pollInterval)
+    setOpponent(roomCheck.player2)
+    setScreen('found')
+    setTimeout(() => { window.location.href = `/game?room=${room_id}` }, 2000)
+  }
+}, 1000)
 
     // Realtime backup
     supabase
