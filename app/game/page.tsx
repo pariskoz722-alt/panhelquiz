@@ -208,7 +208,8 @@ export default function Game() {
       username: myProfileRef.current.username,
       message: text.trim(),
     })
-    if (!error) setChatInput('')
+    if (error) console.error('Chat insert error:', error)
+else setChatInput('')
   }
 
   function handleChatKey(e: React.KeyboardEvent) {
