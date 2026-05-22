@@ -56,90 +56,79 @@ export default function Lobby() {
   await supabase.rpc('cleanup_old_rooms')}
 
   async function findMatch() {
-    if (!profile) return
-    setSearchTime(0)
-    setScreen('matching')
+  if (!profile) return
+  setSearchTime(0)
+  setScreen('matching')
 
-    const { data: existingRoom } = await supabase
+  const { data, error } = await supabase.rpc('find_or_create_room', {
+    p_player_id: profile.id,
+    p_subject: subject,
+    p_grade: grade,
+    p_mode: mode,
+  })
+
+  if (error || !data || data.length === 0) {
+    console.error('Matchmaking error:', error)
+    setScreen('lobby')
+    return
+  }
+
+  const { room_id, is_player1 } = data[0]
+  setRoomId(room_id)
+
+  if (!is_player1) {
+    // Είμαστε player2 — το room είναι ήδη ready
+    const { data: roomData } = await supabase
       .from('game_rooms')
       .select('*, player1:profiles!game_rooms_player1_id_fkey(id, username, elo)')
-      .eq('subject', subject)
-      .eq('grade', grade)
-      .eq('status', 'waiting')
-      .neq('player1_id', profile.id)
-      .limit(1)
+      .eq('id', room_id)
       .single()
 
-    if (existingRoom) {
-      const { data: updatedRoom } = await supabase
-        .from('game_rooms')
-        .update({ player2_id: profile.id, status: 'ready' })
-        .eq('id', existingRoom.id)
-        .select('*, player1:profiles!game_rooms_player1_id_fkey(id, username, elo)')
-        .single()
-
-      if (updatedRoom) {
-        setRoomId(updatedRoom.id)
-        setOpponent(updatedRoom.player1)
-        setScreen('found')
-        setTimeout(() => {
-          window.location.href = `/game?room=${updatedRoom.id}`
-        }, 2000)
-      }
-    } else {
-      const { data: newRoom } = await supabase
-        .from('game_rooms')
-        .insert({ player1_id: profile.id, subject, grade, mode, status: 'waiting' })
-        .select()
-        .single()
-
-      if (newRoom) {
-        setRoomId(newRoom.id)
-
-        // Polling - check every 1.5s if opponent joined
-        const pollInterval = setInterval(async () => {
-          const { data: roomCheck } = await supabase
-            .from('game_rooms')
-            .select('*, player2:profiles!game_rooms_player2_id_fkey(id, username, elo)')
-            .eq('id', newRoom.id)
-            .single()
-          if (roomCheck?.status === 'ready' && roomCheck?.player2_id) {
-            clearInterval(pollInterval)
-            setOpponent(roomCheck.player2)
-            setScreen('found')
-            setTimeout(() => {
-              window.location.href = `/game?room=${newRoom.id}`
-            }, 2000)
-          }
-        }, 1500)
-
-        // Also try realtime
-        supabase
-          .channel(`room-${newRoom.id}`)
-          .on('postgres_changes', {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'game_rooms',
-            filter: `id=eq.${newRoom.id}`,
-          }, async (payload) => {
-            if (payload.new.status === 'ready' && payload.new.player2_id) {
-              clearInterval(pollInterval)
-              const { data: opp } = await supabase
-                .from('profiles')
-                .select('id, username, elo')
-                .eq('id', payload.new.player2_id)
-                .single()
-              setOpponent(opp)
-              setScreen('found')
-              setTimeout(() => {
-                window.location.href = `/game?room=${newRoom.id}`
-              }, 2000)
-            }
-          })
-          .subscribe()
-      }
+    if (roomData) {
+      setOpponent(roomData.player1)
+      setScreen('found')
+      setTimeout(() => { window.location.href = `/game?room=${room_id}` }, 2000)
     }
+  } else {
+    // Είμαστε player1 — περιμένουμε player2
+    const pollInterval = setInterval(async () => {
+      const { data: roomCheck } = await supabase
+        .from('game_rooms')
+        .select('*, player2:profiles!game_rooms_player2_id_fkey(id, username, elo)')
+        .eq('id', room_id)
+        .single()
+
+      if (roomCheck?.status === 'ready' && roomCheck?.player2_id) {
+        clearInterval(pollInterval)
+        setOpponent(roomCheck.player2)
+        setScreen('found')
+        setTimeout(() => { window.location.href = `/game?room=${room_id}` }, 2000)
+      }
+    }, 1500)
+
+    // Realtime backup
+    supabase
+      .channel(`room-${room_id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'game_rooms',
+        filter: `id=eq.${room_id}`,
+      }, async (payload) => {
+        if (payload.new.status === 'ready' && payload.new.player2_id) {
+          const { data: opp } = await supabase
+            .from('profiles')
+            .select('id, username, elo')
+            .eq('id', payload.new.player2_id)
+            .single()
+          setOpponent(opp)
+          setScreen('found')
+          setTimeout(() => { window.location.href = `/game?room=${room_id}` }, 2000)
+        }
+      })
+      .subscribe()
   }
+}
 
   async function cancelMatch() {
     if (roomId) {
