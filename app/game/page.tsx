@@ -138,14 +138,12 @@ if (dbQuestions && dbQuestions.length > 0) {
         filter: `id=eq.${roomId}`,
       }, (payload) => {
         const newRoom = payload.new
-        if (p1) {
-          setScoreOpp(newRoom.score_p2)
-        } else {
-          setScoreOpp(newRoom.score_p1)
-        }
-        if (newRoom.status === 'finished') {
-          setPhase('results')
-        }
+const oppScore = p1 ? newRoom.score_p2 : newRoom.score_p1
+setScoreOpp(oppScore)
+setOppCorrect(Math.round(oppScore / 120))
+if (newRoom.status === 'finished') {
+  setPhase('results')
+}
       })
       .subscribe()
   }
