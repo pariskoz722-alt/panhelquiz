@@ -200,7 +200,7 @@ export default function Game() {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [chatMessages])
 
-  async function sendMessage(text: string) {
+  async function sendMessage(text: string) {console.log('debug', { room: currentRoomRef.current?.id, profile: myProfileRef.current?.id })
     if (!text.trim() || chatExpired || !currentRoomRef.current || !myProfileRef.current) return
     const { error } = await supabase.from('chat_messages').insert({
       room_id: currentRoomRef.current.id,
