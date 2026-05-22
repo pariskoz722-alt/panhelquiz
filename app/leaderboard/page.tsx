@@ -86,27 +86,96 @@ export default function LeaderboardPage() {
         .toggle-btn { transition: all 0.2s ease; cursor: pointer; }
         .podium-card { transition: transform 0.25s ease; }
         .podium-card:hover { transform: translateY(-6px) scale(1.02); }
+        .leaderboard-nav-links::-webkit-scrollbar,
+        .filter-scroll::-webkit-scrollbar {
+          display: none;
+        }
+        .leaderboard-nav-links,
+        .filter-scroll {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+        @media (max-width: 640px) {
+          .leaderboard-nav {
+            padding: 0 12px !important;
+            gap: 10px;
+          }
+          .leaderboard-logo {
+            font-size: 18px !important;
+            flex: 0 0 auto;
+          }
+          .leaderboard-nav-links {
+            flex: 1 1 auto;
+            overflow-x: auto;
+            justify-content: flex-start !important;
+            gap: 6px !important;
+            min-width: 0;
+          }
+          .leaderboard-nav-link {
+            padding: 6px 10px !important;
+            font-size: 13px !important;
+            flex: 0 0 auto;
+          }
+          .leaderboard-theme-toggle {
+            margin-left: 2px !important;
+            padding: 6px 9px !important;
+            flex: 0 0 auto;
+          }
+          .leaderboard-page {
+            padding-top: 78px !important;
+          }
+          .leaderboard-container {
+            padding: 0 16px !important;
+          }
+          .leaderboard-header {
+            margin-bottom: 30px !important;
+          }
+          .filter-scroll {
+            flex-wrap: nowrap !important;
+            overflow-x: auto;
+            padding-bottom: 4px;
+            margin-left: -16px;
+            margin-right: -16px;
+            padding-left: 16px;
+            padding-right: 16px;
+          }
+          .leaderboard-podium {
+            flex-wrap: nowrap !important;
+            overflow-x: auto;
+            justify-content: flex-start !important;
+            padding: 4px 16px 0;
+            margin-left: -16px;
+            margin-right: -16px;
+          }
+          .leaderboard-table-card {
+            overflow-x: auto !important;
+          }
+          .leaderboard-table-header,
+          .leaderboard-table-row {
+            min-width: 620px;
+          }
+        }
       `}</style>
 
-      <nav style={{
+      <nav className="leaderboard-nav" style={{
         position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100,
         backdropFilter: 'blur(10px)', background: c.navBg,
         borderBottom: `1px solid ${c.navBorder}`,
         padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60,
       }}>
         <a href="/" style={{ textDecoration: 'none' }}>
-          <span style={{ fontSize: 20, fontWeight: 800, color: '#1D9E75' }}>
+          <span className="leaderboard-logo" style={{ fontSize: 20, fontWeight: 800, color: '#1D9E75' }}>
             Panhe<span style={{ color: c.text }}>Quiz</span>
           </span>
         </a>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div className="leaderboard-nav-links" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {[
             { label: 'Dashboard', href: '/dashboard' },
             { label: 'Lobby', href: '/lobby' },
             { label: 'Leaderboard', href: '/leaderboard', active: true },
             { label: 'Profile', href: '/profile' },
           ].map(link => (
-            <a key={link.href} href={link.href} style={{
+            <a key={link.href} href={link.href} className="leaderboard-nav-link" style={{
               textDecoration: 'none', padding: '6px 14px', borderRadius: 8,
               fontSize: 14, fontWeight: link.active ? 700 : 500,
               color: link.active ? '#1D9E75' : c.textSub,
@@ -114,7 +183,7 @@ export default function LeaderboardPage() {
               border: link.active ? '1px solid rgba(29,158,117,0.3)' : '1px solid transparent',
             }}>{link.label}</a>
           ))}
-          <button className="toggle-btn" onClick={toggleDark} style={{
+          <button className="toggle-btn leaderboard-theme-toggle" onClick={toggleDark} style={{
             marginLeft: 8, padding: '6px 12px', borderRadius: 20,
             border: `1px solid ${c.cardBorder}`,
             background: dark ? 'rgba(255,255,255,0.08)' : '#f3f4f6',
@@ -123,16 +192,16 @@ export default function LeaderboardPage() {
         </div>
       </nav>
 
-      <div style={{
+      <div className="leaderboard-page" style={{
         minHeight: '100vh',
         background: dark ? 'linear-gradient(135deg, #0A0E14 0%, #0D1A15 50%, #0A0E14 100%)' : '#f9fafb',
         paddingTop: 80, paddingBottom: 60, color: c.text,
         transition: 'background 0.3s ease',
       }}>
-        <div style={{ maxWidth: 900, margin: '0 auto', padding: '0 20px' }}>
+        <div className="leaderboard-container" style={{ maxWidth: 900, margin: '0 auto', padding: '0 20px' }}>
 
           {/* Header */}
-          <div style={{ textAlign: 'center', marginBottom: 40, opacity: visible ? 1 : 0, transform: visible ? 'translateY(0)' : 'translateY(20px)', transition: 'all 0.6s ease' }}>
+          <div className="leaderboard-header" style={{ textAlign: 'center', marginBottom: 40, opacity: visible ? 1 : 0, transform: visible ? 'translateY(0)' : 'translateY(20px)', transition: 'all 0.6s ease' }}>
             <div style={{ fontSize: 40, marginBottom: 8 }}>🏆</div>
             <h1 style={{ fontSize: 'clamp(28px, 5vw, 42px)', fontWeight: 900, margin: '0 0 10px', color: '#1D9E75' }}>Εθνική Κατάταξη</h1>
             <p style={{ color: c.textSub, fontSize: 16, margin: 0 }}>Οι κορυφαίοι μαθητές της Ελλάδας</p>
@@ -141,7 +210,7 @@ export default function LeaderboardPage() {
           {/* Filters */}
           <div style={{ opacity: visible ? 1 : 0, transition: 'all 0.6s ease 0.15s', marginBottom: 36 }}>
             <div style={{ fontSize: 12, color: c.textMuted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Μάθημα</div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+            <div className="filter-scroll" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
               {SUBJECTS.map(s => (
                 <button key={s} className="filter-btn" onClick={() => setSelectedSubject(s)} style={{
                   padding: '8px 16px', borderRadius: 20, fontSize: 13, fontWeight: 600,
@@ -152,7 +221,7 @@ export default function LeaderboardPage() {
               ))}
             </div>
             <div style={{ fontSize: 12, color: c.textMuted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Τάξη</div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <div className="filter-scroll" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {CLASSES.map(cl => (
                 <button key={cl} className="filter-btn" onClick={() => setSelectedClass(cl)} style={{
                   padding: '8px 16px', borderRadius: 20, fontSize: 13, fontWeight: 600,
@@ -170,7 +239,7 @@ export default function LeaderboardPage() {
             <>
               {/* Podium */}
               {top3.length === 3 && (
-                <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 16, flexWrap: 'wrap', marginBottom: 40, opacity: visible ? 1 : 0, transition: 'all 0.6s ease 0.25s' }}>
+                <div className="leaderboard-podium" style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 16, flexWrap: 'wrap', marginBottom: 40, opacity: visible ? 1 : 0, transition: 'all 0.6s ease 0.25s' }}>
                   <PodiumCard player={top3[1]} rank={2} podiumHeight={110} delay={0.35} dark={dark} c={c} />
                   <PodiumCard player={top3[0]} rank={1} podiumHeight={150} delay={0.2} isFirst dark={dark} c={c} />
                   <PodiumCard player={top3[2]} rank={3} podiumHeight={80} delay={0.5} dark={dark} c={c} />
@@ -179,15 +248,15 @@ export default function LeaderboardPage() {
 
               {/* Table */}
               {rest.length > 0 && (
-                <div style={{ background: c.card, border: `1px solid ${c.cardBorder}`, borderRadius: 16, overflow: 'hidden', boxShadow: dark ? 'none' : '0 1px 4px rgba(0,0,0,0.06)', marginBottom: 20 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr 120px 100px 80px', padding: '14px 20px', borderBottom: `1px solid ${c.cardBorder}`, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: c.textMuted }}>
+                <div className="leaderboard-table-card" style={{ background: c.card, border: `1px solid ${c.cardBorder}`, borderRadius: 16, overflow: 'hidden', boxShadow: dark ? 'none' : '0 1px 4px rgba(0,0,0,0.06)', marginBottom: 20 }}>
+                  <div className="leaderboard-table-header" style={{ display: 'grid', gridTemplateColumns: '60px 1fr 120px 100px 80px', padding: '14px 20px', borderBottom: `1px solid ${c.cardBorder}`, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: c.textMuted }}>
                     <span>#</span><span>Παίκτης</span>
                     <span style={{ textAlign: 'center' }}>ELO</span>
                     <span style={{ textAlign: 'center' }}>Win Rate</span>
                     <span style={{ textAlign: 'center' }}>Νίκες</span>
                   </div>
                   {rest.map((player, i) => (
-                    <div key={player.id} className="row-hover" style={{
+                    <div key={player.id} className="row-hover leaderboard-table-row" style={{
                       display: 'grid', gridTemplateColumns: '60px 1fr 120px 100px 80px',
                       padding: '16px 20px',
                       borderBottom: i < rest.length - 1 ? `1px solid ${c.rowBorder}` : 'none',
