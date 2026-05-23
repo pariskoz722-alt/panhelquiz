@@ -80,7 +80,7 @@ export default function ProfilePage() {
   async function handleDeleteAccount() {
     setDeleting(true)
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    if (!user) { setDeleting(false); return }
 
     // Delete profile data
     await supabase.from('profiles').delete().eq('id', user.id)
@@ -117,11 +117,15 @@ export default function ProfilePage() {
         .input-field { border-radius: 10px; color: inherit; padding: 10px 14px; font-size: 15px; width: 100%; outline: none; box-sizing: border-box; }
         .input-field:focus { border-color: #1D9E75; }
         .toggle-btn { transition: all 0.2s ease; cursor: pointer; }
+        @media (max-width: 640px) {
+          .profile-stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
+          .profile-nav-links { display: none !important; }
+        }
       `}</style>
 
       <nav style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100, backdropFilter: 'blur(10px)', background: c.navBg, borderBottom: `1px solid ${c.navBorder}`, padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60 }}>
         <a href="/" style={{ textDecoration: 'none' }}>
-          <span style={{ fontSize: 20, fontWeight: 800, color: '#1D9E75' }}>Panhe<span style={{ color: c.text }}>Quiz</span></span>
+          <span style={{ fontSize: 20, fontWeight: 800, color: '#1D9E75' }}>Panhel<span style={{ color: c.text }}>Quiz</span></span>
         </a>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {[
@@ -188,7 +192,7 @@ export default function ProfilePage() {
               {/* Stats */}
               {activeTab === 'stats' && (
                 <div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 24 }}>
+                  <div className="profile-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 24 }}>
                     {[
                       { label: 'Νίκες', value: profile?.wins || 0, icon: '🏆', color: '#1D9E75' },
                       { label: 'Ήττες', value: profile?.losses || 0, icon: '💔', color: '#ef4444' },
@@ -212,24 +216,28 @@ export default function ProfilePage() {
                     <div style={{ padding: '40px 20px', textAlign: 'center', color: c.textSub }}>
                       Δεν έχεις παίξει ακόμα! <a href="/lobby" style={{ color: '#1D9E75', fontWeight: 700 }}>Παίξε τώρα →</a>
                     </div>
-                  ) : recentGames.map((game, i) => {
-                    const isP1 = game.player1_id === profile?.id
-                    const opp = isP1 ? game.player2?.username : game.player1?.username
-                    const won = game.winner_id === profile?.id
-                    return (
-                      <div key={game.id} style={{ display: 'grid', gridTemplateColumns: '1fr 100px 120px 80px', padding: '16px 20px', borderBottom: i < recentGames.length - 1 ? `1px solid ${c.rowBorder}` : 'none', alignItems: 'center' }}>
-                        <div>
-                          <div style={{ fontSize: 14, fontWeight: 700, color: c.text }}>{opp || 'Άγνωστος'}</div>
-                          <div style={{ fontSize: 12, color: c.textSub }}>{new Date(game.created_at).toLocaleDateString('el-GR')}</div>
-                        </div>
-                        <div style={{ textAlign: 'center' }}>
-                          <span style={{ padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 800, background: won ? 'rgba(29,158,117,0.1)' : 'rgba(239,68,68,0.1)', color: won ? '#1D9E75' : '#ef4444' }}>{won ? 'Νίκη' : 'Ήττα'}</span>
-                        </div>
-                        <div style={{ textAlign: 'center', fontSize: 13, color: c.textSub }}>{game.subject}</div>
-                        <div style={{ textAlign: 'right', fontSize: 15, fontWeight: 800, color: won ? '#1D9E75' : '#ef4444' }}>{won ? '+' : '-'}{game.elo_change}</div>
-                      </div>
-                    )
-                  })}
+                  ) : (
+                    <div style={{ overflowX: 'auto' }}>
+                      {recentGames.map((game, i) => {
+                        const isP1 = game.player1_id === profile?.id
+                        const opp = isP1 ? game.player2?.username : game.player1?.username
+                        const won = game.winner_id === profile?.id
+                        return (
+                          <div key={game.id} style={{ display: 'grid', gridTemplateColumns: '1fr 90px 110px 70px', minWidth: 380, padding: '16px 20px', borderBottom: i < recentGames.length - 1 ? `1px solid ${c.rowBorder}` : 'none', alignItems: 'center' }}>
+                            <div>
+                              <div style={{ fontSize: 14, fontWeight: 700, color: c.text }}>{opp || 'Άγνωστος'}</div>
+                              <div style={{ fontSize: 12, color: c.textSub }}>{new Date(game.created_at).toLocaleDateString('el-GR')}</div>
+                            </div>
+                            <div style={{ textAlign: 'center' }}>
+                              <span style={{ padding: '4px 10px', borderRadius: 20, fontSize: 12, fontWeight: 800, background: won ? 'rgba(29,158,117,0.1)' : 'rgba(239,68,68,0.1)', color: won ? '#1D9E75' : '#ef4444' }}>{won ? 'Νίκη' : 'Ήττα'}</span>
+                            </div>
+                            <div style={{ textAlign: 'center', fontSize: 13, color: c.textSub }}>{game.subject}</div>
+                            <div style={{ textAlign: 'right', fontSize: 15, fontWeight: 800, color: won ? '#1D9E75' : '#ef4444' }}>{won ? '+' : '-'}{game.elo_change}</div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
 

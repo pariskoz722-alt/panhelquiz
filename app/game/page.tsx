@@ -40,6 +40,9 @@ export default function Game() {
   const chatBottomRef = useRef<HTMLDivElement>(null)
   const currentRoomRef = useRef<any>(null)
   const myProfileRef = useRef<any>(null)
+  const oppProfileRef = useRef<any>(null)
+  const isPlayer1Ref = useRef(false)
+  const gameChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
   const { dark, toggleDark } = useTheme()
   const { addToast } = useToast()
@@ -65,6 +68,9 @@ export default function Game() {
 
   useEffect(() => {
     loadGame()
+    return () => {
+      if (gameChannelRef.current) supabase.removeChannel(gameChannelRef.current)
+    }
   }, [])
 
   async function loadGame() {
@@ -87,11 +93,13 @@ export default function Game() {
     currentRoomRef.current = roomData
     const p1 = roomData.player1_id === user.id
     setIsPlayer1(p1)
+    isPlayer1Ref.current = p1
     const me = p1 ? roomData.player1 : roomData.player2
     const opp = p1 ? roomData.player2 : roomData.player1
     setMyProfile(me)
     myProfileRef.current = me
     setOppProfile(opp)
+    oppProfileRef.current = opp
 
     const { data: allQuestions } = await supabase
       .from('questions')
@@ -105,13 +113,14 @@ export default function Game() {
       setQuestions(pickQuestions(roomData.subject))
     }
 
-    supabase
+    gameChannelRef.current = supabase
       .channel(`game-${roomId}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'game_rooms', filter: `id=eq.${roomId}` }, (payload) => {
         const newRoom = payload.new
         const oppScore = p1 ? newRoom.score_p2 : newRoom.score_p1
         setScoreOpp(oppScore)
-        setOppCorrect(Math.round(oppScore / 120))
+        // Estimate opponent's correct answers (min 100pts, max 175pts per correct answer)
+        setOppCorrect(Math.min(5, Math.round(oppScore / 125)))
         if (newRoom.status === 'finished') setPhase('results')
       })
       .subscribe()
@@ -158,7 +167,7 @@ export default function Game() {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [chatMessages])
 
-  async function sendMessage(text: string) {console.log('debug', { room: currentRoomRef.current?.id, profile: myProfileRef.current?.id })
+  async function sendMessage(text: string) {
     if (!text.trim() || chatExpired || !currentRoomRef.current || !myProfileRef.current) return
     const { error } = await supabase.from('chat_messages').insert({
       room_id: currentRoomRef.current.id,
@@ -167,7 +176,7 @@ export default function Game() {
       message: text.trim(),
     })
     if (error) console.error('Chat insert error:', error)
-else setChatInput('')
+    else setChatInput('')
   }
 
   function handleChatKey(e: React.KeyboardEvent) {
@@ -202,7 +211,7 @@ else setChatInput('')
     const iWon = finalScoreYou > finalScoreOpp
     const eloChange = iWon ? 18 : -14
     const me = myProfileRef.current
-    const opp = oppProfile
+    const opp = oppProfileRef.current  // use ref, not stale state closure
     const newElo = me.elo + eloChange
 
     await supabase.from('game_rooms').update({ status: 'finished' }).eq('id', currentRoomRef.current.id)
@@ -211,15 +220,18 @@ else setChatInput('')
       wins: iWon ? me.wins + 1 : me.wins,
       losses: iWon ? me.losses : me.losses + 1,
     }).eq('id', me.id)
-    await supabase.from('games').insert({
-      player1_id: currentRoomRef.current.player1_id,
-      player2_id: currentRoomRef.current.player2_id,
-      winner_id: iWon ? me.id : opp?.id,
-      subject: currentRoomRef.current.subject,
-      score_p1: isPlayer1 ? finalScoreYou : finalScoreOpp,
-      score_p2: isPlayer1 ? finalScoreOpp : finalScoreYou,
-      elo_change: Math.abs(eloChange),
-    })
+    // Only player1 inserts the games record — prevents duplicate rows from both tabs
+    if (isPlayer1Ref.current) {
+      await supabase.from('games').insert({
+        player1_id: currentRoomRef.current.player1_id,
+        player2_id: currentRoomRef.current.player2_id,
+        winner_id: iWon ? me.id : opp?.id,
+        subject: currentRoomRef.current.subject,
+        score_p1: finalScoreYou,
+        score_p2: finalScoreOpp,
+        elo_change: Math.abs(eloChange),
+      })
+    }
 
     // Game result toast + notification
     const oppName = opp?.username || 'Αντίπαλος'
@@ -390,35 +402,41 @@ else setChatInput('')
             </div>
 
             <div style={{ maxWidth: 560, margin: '0 auto', padding: '24px 20px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                <span style={{ background: c.tagBg, borderRadius: 20, padding: '3px 10px', fontSize: 12, fontWeight: 700, color: c.textSub }}>Ερώτηση {cur + 1}/{questions.length}</span>
-              </div>
-              <div className="q-text-anim" key={cur} style={{ fontSize: 20, fontWeight: 700, color: c.text, lineHeight: 1.4, marginBottom: 20 }}>
-                {questions[cur].q}
-              </div>
-              <div className="answers-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
-                {questions[cur].answers.map((a, i) => {
-                  const correct = questions[cur].correct
-                  let cls = 'ans-btn'
-                  if (selected !== null) {
-                    if (i === correct) cls += ' correct'
-                    else if (i === selected) cls += ' wrong'
-                  }
-                  return (
-                    <button key={i} className={cls} onClick={() => pick(i)} disabled={selected !== null}
-                      style={{ background: c.ansBg, border: `2px solid ${c.ansBorder}`, color: c.text }}>
-                      <div style={{ width: 26, height: 26, borderRadius: '50%', background: c.tagBg, color: c.textSub, fontSize: 12, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        {['Α', 'Β', 'Γ', 'Δ'][i]}
-                      </div>
-                      {a}
-                    </button>
-                  )
-                })}
-              </div>
-              {feedback && (
-                <div className="feedback-bar" style={{ background: feedback === 'correct' ? '#E1F5EE' : feedback === 'wrong' ? '#FCEBEB' : '#FAEEDA', color: feedback === 'correct' ? '#0F6E56' : feedback === 'wrong' ? '#A32D2D' : '#633806' }}>
-                  {feedback === 'correct' ? `✓ Σωστό! +${100 + time * 5} πόντοι` : feedback === 'wrong' ? `✗ Λάθος! Σωστό: ${questions[cur].answers[questions[cur].correct]}` : `⏱ Τέλος χρόνου! Σωστό: ${questions[cur].answers[questions[cur].correct]}`}
-                </div>
+              {questions[cur] ? (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                    <span style={{ background: c.tagBg, borderRadius: 20, padding: '3px 10px', fontSize: 12, fontWeight: 700, color: c.textSub }}>Ερώτηση {cur + 1}/{questions.length}</span>
+                  </div>
+                  <div className="q-text-anim" key={cur} style={{ fontSize: 20, fontWeight: 700, color: c.text, lineHeight: 1.4, marginBottom: 20 }}>
+                    {questions[cur].q}
+                  </div>
+                  <div className="answers-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+                    {questions[cur].answers.map((a, i) => {
+                      const correct = questions[cur].correct
+                      let cls = 'ans-btn'
+                      if (selected !== null) {
+                        if (i === correct) cls += ' correct'
+                        else if (i === selected) cls += ' wrong'
+                      }
+                      return (
+                        <button key={i} className={cls} onClick={() => pick(i)} disabled={selected !== null}
+                          style={{ background: c.ansBg, border: `2px solid ${c.ansBorder}`, color: c.text }}>
+                          <div style={{ width: 26, height: 26, borderRadius: '50%', background: c.tagBg, color: c.textSub, fontSize: 12, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            {['Α', 'Β', 'Γ', 'Δ'][i]}
+                          </div>
+                          {a}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {feedback && (
+                    <div className="feedback-bar" style={{ background: feedback === 'correct' ? '#E1F5EE' : feedback === 'wrong' ? '#FCEBEB' : '#FAEEDA', color: feedback === 'correct' ? '#0F6E56' : feedback === 'wrong' ? '#A32D2D' : '#633806' }}>
+                      {feedback === 'correct' ? `✓ Σωστό! +${100 + time * 5} πόντοι` : feedback === 'wrong' ? `✗ Λάθος! Σωστό: ${questions[cur].answers[questions[cur].correct]}` : `⏱ Τέλος χρόνου! Σωστό: ${questions[cur].answers[questions[cur].correct]}`}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '40px 0', color: c.textSub }}>Φόρτωση ερωτήσεων...</div>
               )}
             </div>
           </>

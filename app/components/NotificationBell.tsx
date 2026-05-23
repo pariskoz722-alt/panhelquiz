@@ -22,12 +22,15 @@ export default function NotificationBell() {
   const unread = notifications.filter(n => !n.read).length
 
   useEffect(() => {
+    // Keep a ref outside the .then() so the cleanup function can reach it
+    let channel: ReturnType<typeof supabase.channel> | null = null
+
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return
       setUserId(user.id)
       fetchNotifications(user.id)
 
-      const channel = supabase
+      channel = supabase
         .channel(`notif-bell-${user.id}`)
         .on('postgres_changes', {
           event: 'INSERT',
@@ -38,9 +41,10 @@ export default function NotificationBell() {
           setNotifications(prev => [payload.new as Notification, ...prev].slice(0, 30))
         })
         .subscribe()
-
-      return () => { supabase.removeChannel(channel) }
     })
+
+    // Cleanup runs when component unmounts — the channel ref is reachable here
+    return () => { if (channel) supabase.removeChannel(channel) }
   }, [])
 
   async function fetchNotifications(uid: string) {

@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useTheme } from '../context/ThemeContext'
 import { supabase } from '../lib/supabase'
 import NotificationBell from '../components/NotificationBell'
@@ -27,6 +27,10 @@ export default function Lobby() {
   const [playerCounts, setPlayerCounts] = useState<Record<string, number>>({})
   const { dark, toggleDark } = useTheme()
   const { addToast } = useToast()
+  // Refs so cancelMatch() can stop an in-progress search
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const matchChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
+  const matchCancelledRef = useRef(false)
 
   const c = {
     bg: dark ? '#0A0E14' : '#f9fafb',
@@ -104,87 +108,92 @@ export default function Lobby() {
   }
 
   async function findMatch() {
-  if (!profile) return
-  setSearchTime(0)
-  setScreen('matching')
+    if (!profile) return
+    matchCancelledRef.current = false
+    setSearchTime(0)
+    setScreen('matching')
 
-  const { data, error } = await supabase.rpc('find_or_create_room', {
-    p_player_id: profile.id,
-    p_subject: subject,
-    p_grade: grade,
-    p_mode: mode,
-  })
+    const { data, error } = await supabase.rpc('find_or_create_room', {
+      p_player_id: profile.id,
+      p_subject: subject,
+      p_grade: grade,
+      p_mode: mode,
+    })
 
-  if (error || !data || data.length === 0) {
-    console.error('Matchmaking error:', error)
-    setScreen('lobby')
-    return
-  }
-
-  const { room_id, is_player1 } = data[0]
-  setRoomId(room_id)
-
-  if (!is_player1) {
-    // Είμαστε player2 — το room είναι ήδη ready
-    const { data: roomData } = await supabase
-      .from('game_rooms')
-      .select('*, player1:profiles!game_rooms_player1_id_fkey(id, username, elo)')
-      .eq('id', room_id)
-      .single()
-
-    if (roomData) {
-      setOpponent(roomData.player1)
-      setScreen('found')
-      addToast({ type: 'info', title: 'Αντίπαλος βρέθηκε!', message: `vs ${roomData.player1?.username}` })
-      setTimeout(() => { window.location.href = `/game?room=${room_id}` }, 2000)
+    if (error || !data || data.length === 0) {
+      console.error('Matchmaking error:', error)
+      setScreen('lobby')
+      return
     }
-  } else {
-    // Είμαστε player1 — περιμένουμε player2
-    let stopped = false
-const pollInterval = setInterval(async () => {
-  if (stopped) return
-  const { data: roomCheck } = await supabase
-    .from('game_rooms')
-    .select('*, player2:profiles!game_rooms_player2_id_fkey(id, username, elo)')
-    .eq('id', room_id)
-    .single()
 
-  if (roomCheck?.status === 'ready' && roomCheck?.player2_id) {
-    stopped = true
-    clearInterval(pollInterval)
-    setOpponent(roomCheck.player2)
-    setScreen('found')
-    addToast({ type: 'info', title: 'Αντίπαλος βρέθηκε!', message: `vs ${roomCheck.player2?.username}` })
-    setTimeout(() => { window.location.href = `/game?room=${room_id}` }, 2000)
-  }
-}, 1000)
+    const { room_id, is_player1 } = data[0]
+    setRoomId(room_id)
 
-    // Realtime backup
-    supabase
-      .channel(`room-${room_id}`)
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'game_rooms',
-        filter: `id=eq.${room_id}`,
-      }, async (payload) => {
-        if (payload.new.status === 'ready' && payload.new.player2_id) {
-          const { data: opp } = await supabase
-            .from('profiles')
-            .select('id, username, elo')
-            .eq('id', payload.new.player2_id)
-            .single()
-          setOpponent(opp)
+    if (!is_player1) {
+      // Είμαστε player2 — το room είναι ήδη ready
+      const { data: roomData } = await supabase
+        .from('game_rooms')
+        .select('*, player1:profiles!game_rooms_player1_id_fkey(id, username, elo)')
+        .eq('id', room_id)
+        .single()
+
+      if (roomData && !matchCancelledRef.current) {
+        setOpponent(roomData.player1)
+        setScreen('found')
+        addToast({ type: 'info', title: 'Αντίπαλος βρέθηκε!', message: `vs ${roomData.player1?.username}` })
+        setTimeout(() => { if (!matchCancelledRef.current) window.location.href = `/game?room=${room_id}` }, 2000)
+      }
+    } else {
+      // Είμαστε player1 — περιμένουμε player2
+      pollIntervalRef.current = setInterval(async () => {
+        if (matchCancelledRef.current) { clearInterval(pollIntervalRef.current!); return }
+        const { data: roomCheck } = await supabase
+          .from('game_rooms')
+          .select('*, player2:profiles!game_rooms_player2_id_fkey(id, username, elo)')
+          .eq('id', room_id)
+          .single()
+
+        if (roomCheck?.status === 'ready' && roomCheck?.player2_id && !matchCancelledRef.current) {
+          clearInterval(pollIntervalRef.current!)
+          pollIntervalRef.current = null
+          setOpponent(roomCheck.player2)
           setScreen('found')
-          addToast({ type: 'info', title: 'Αντίπαλος βρέθηκε!', message: `vs ${opp?.username}` })
-          setTimeout(() => { window.location.href = `/game?room=${room_id}` }, 2000)
+          addToast({ type: 'info', title: 'Αντίπαλος βρέθηκε!', message: `vs ${roomCheck.player2?.username}` })
+          setTimeout(() => { if (!matchCancelledRef.current) window.location.href = `/game?room=${room_id}` }, 2000)
         }
-      })
-      .subscribe()
+      }, 1000)
+
+      // Realtime backup
+      matchChannelRef.current = supabase
+        .channel(`room-${room_id}`)
+        .on('postgres_changes', {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'game_rooms',
+          filter: `id=eq.${room_id}`,
+        }, async (payload) => {
+          if (matchCancelledRef.current) return
+          if (payload.new.status === 'ready' && payload.new.player2_id) {
+            const { data: opp } = await supabase
+              .from('profiles')
+              .select('id, username, elo')
+              .eq('id', payload.new.player2_id)
+              .single()
+            if (matchCancelledRef.current) return
+            setOpponent(opp)
+            setScreen('found')
+            addToast({ type: 'info', title: 'Αντίπαλος βρέθηκε!', message: `vs ${opp?.username}` })
+            setTimeout(() => { if (!matchCancelledRef.current) window.location.href = `/game?room=${room_id}` }, 2000)
+          }
+        })
+        .subscribe()
+    }
   }
-}
 
   async function cancelMatch() {
+    matchCancelledRef.current = true
+    if (pollIntervalRef.current) { clearInterval(pollIntervalRef.current); pollIntervalRef.current = null }
+    if (matchChannelRef.current) { supabase.removeChannel(matchChannelRef.current); matchChannelRef.current = null }
     if (roomId) {
       await supabase.from('game_rooms').delete().eq('id', roomId)
       setRoomId(null)

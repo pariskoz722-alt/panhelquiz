@@ -25,7 +25,7 @@ export default function CookieBanner() {
 
   return (
     <div style={{
-      position: 'fixed', bottom: 20, left: 20, right: 20, zIndex: 9999,
+      position: 'fixed', bottom: 'max(20px, calc(env(safe-area-inset-bottom) + 12px))', left: 20, right: 20, zIndex: 9999,
       maxWidth: 520, margin: '0 auto',
       background: dark ? '#1a1a2e' : '#fff',
       border: `1px solid ${dark ? 'rgba(255,255,255,0.1)' : '#e5e7eb'}`,

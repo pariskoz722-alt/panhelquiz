@@ -76,7 +76,7 @@ export default function Dashboard() {
       const points: number[] = [elo]
       for (let i = finished.length - 1; i >= 0; i--) {
         const g = finished[i]
-        const change = g.elo_change || 18
+        const change = g.elo_change ?? (g.winner_id === user.id ? 18 : 14)
         elo = g.winner_id === user.id ? elo - change : elo + change
         points.unshift(elo)
       }
@@ -129,6 +129,7 @@ export default function Dashboard() {
       <style>{`
         @media (max-width: 640px) {
           .stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
+          .subject-stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
           .main-grid { grid-template-columns: 1fr !important; }
           .welcome-row { flex-direction: column !important; align-items: flex-start !important; gap: 12px !important; }
           .new-game-btn { width: 100% !important; text-align: center !important; }
@@ -340,7 +341,7 @@ export default function Dashboard() {
               <div style={{ fontSize: 13, fontWeight: 700, color: c.text }}>📊 Στατιστικά ανά μάθημα</div>
               <a href="/practice" style={{ fontSize: 12, fontWeight: 700, color: '#1D9E75', textDecoration: 'none' }}>Εξάσκηση →</a>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+            <div className="subject-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
               {Object.entries(subjectMeta).map(([id, meta]) => {
                 const s = subjectStats[id]
                 const total = s ? s.wins + s.losses : 0

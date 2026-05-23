@@ -128,12 +128,12 @@ export default function Login() {
                 <p style={{ fontSize: 13, color: c.textSub, marginBottom: 22 }}>Σύνδεσε τον λογαριασμό σου.</p>
                 <div style={{ marginBottom: 14 }}>
                   <label style={{ fontSize: 12, fontWeight: 600, color: c.textSub, display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Email</label>
-                  <input className="input" type="email" placeholder="maria@example.com" value={email} onChange={e => setEmail(e.target.value)}
+                  <input className="input" type="email" autoComplete="email" placeholder="maria@example.com" value={email} onChange={e => setEmail(e.target.value)}
                     style={{ background: c.inputBg, border: `1.5px solid ${c.inputBorder}`, color: c.text }} />
                 </div>
                 <div style={{ marginBottom: 20 }}>
                   <label style={{ fontSize: 12, fontWeight: 600, color: c.textSub, display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Κωδικός</label>
-                  <input className="input" type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)}
+                  <input className="input" type="password" autoComplete="current-password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)}
                     style={{ background: c.inputBg, border: `1.5px solid ${c.inputBorder}`, color: c.text }} />
                 </div>
                 <button className="btn" onClick={handleLogin} disabled={loading}>{loading ? 'Σύνδεση...' : 'Σύνδεση'}</button>
@@ -147,17 +147,17 @@ export default function Login() {
                 <p style={{ fontSize: 13, color: c.textSub, marginBottom: 22 }}>Δωρεάν. Χωρίς πιστωτική κάρτα.</p>
                 <div style={{ marginBottom: 14 }}>
                   <label style={{ fontSize: 12, fontWeight: 600, color: c.textSub, display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Όνομα</label>
-                  <input className="input" placeholder="Μαρία Παπαδοπούλου" value={name} onChange={e => setName(e.target.value)}
+                  <input className="input" autoComplete="name" placeholder="Μαρία Παπαδοπούλου" value={name} onChange={e => setName(e.target.value)}
                     style={{ background: c.inputBg, border: `1.5px solid ${c.inputBorder}`, color: c.text }} />
                 </div>
                 <div style={{ marginBottom: 14 }}>
                   <label style={{ fontSize: 12, fontWeight: 600, color: c.textSub, display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Email</label>
-                  <input className="input" type="email" placeholder="maria@example.com" value={email} onChange={e => setEmail(e.target.value)}
+                  <input className="input" type="email" autoComplete="email" placeholder="maria@example.com" value={email} onChange={e => setEmail(e.target.value)}
                     style={{ background: c.inputBg, border: `1.5px solid ${c.inputBorder}`, color: c.text }} />
                 </div>
                 <div style={{ marginBottom: 14 }}>
                   <label style={{ fontSize: 12, fontWeight: 600, color: c.textSub, display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Κωδικός</label>
-                  <input className="input" type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)}
+                  <input className="input" type="password" autoComplete="new-password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)}
                     style={{ background: c.inputBg, border: `1.5px solid ${c.inputBorder}`, color: c.text }} />
                 </div>
                 <div style={{ marginBottom: 14 }}>

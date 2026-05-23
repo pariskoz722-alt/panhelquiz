@@ -4,6 +4,7 @@ import "./globals.css";
 import { ThemeProvider } from "./context/ThemeContext";
 import CookieBanner from "./components/CookieBanner";
 import { ToastProvider } from "./components/Toast";
+import PWASetup from "./components/PWASetup";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -77,6 +78,7 @@ export default function RootLayout({
           <ToastProvider>
             {children}
             <CookieBanner />
+            <PWASetup />
           </ToastProvider>
         </ThemeProvider>
       </body>

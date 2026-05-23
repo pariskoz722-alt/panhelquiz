@@ -166,7 +166,7 @@ export default function LeaderboardPage() {
       }}>
         <a href="/" style={{ textDecoration: 'none' }}>
           <span className="leaderboard-logo" style={{ fontSize: 20, fontWeight: 800, color: '#1D9E75' }}>
-            Panhe<span style={{ color: c.text }}>Quiz</span>
+            Panhel<span style={{ color: c.text }}>Quiz</span>
           </span>
         </a>
         <div className="leaderboard-nav-links" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
