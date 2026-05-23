@@ -5,13 +5,13 @@ import { supabase } from '../lib/supabase'
 import NotificationBell from '../components/NotificationBell'
 import { useToast } from '../components/Toast'
 
-const subjects = [
-  { id: 'math', name: 'Μαθηματικά', icon: '∑', color: '#1D9E75', players: 89 },
-  { id: 'physics', name: 'Φυσική', icon: '⚛', color: '#378ADD', players: 54 },
-  { id: 'chemistry', name: 'Χημεία', icon: '⚗', color: '#D85A30', players: 31 },
-  { id: 'history', name: 'Ιστορία', icon: '📜', color: '#7F77DD', players: 47 },
-  { id: 'biology', name: 'Βιολογία', icon: '🧬', color: '#639922', players: 28 },
-  { id: 'lit', name: 'Έκθεση', icon: '✍', color: '#BA7517', players: 22 },
+const BASE_SUBJECTS = [
+  { id: 'math',      name: 'Μαθηματικά', icon: '∑',  color: '#1D9E75' },
+  { id: 'physics',   name: 'Φυσική',     icon: '⚛',  color: '#378ADD' },
+  { id: 'chemistry', name: 'Χημεία',     icon: '⚗',  color: '#D85A30' },
+  { id: 'history',   name: 'Ιστορία',    icon: '📜', color: '#7F77DD' },
+  { id: 'biology',   name: 'Βιολογία',   icon: '🧬', color: '#639922' },
+  { id: 'lit',       name: 'Έκθεση',     icon: '✍',  color: '#BA7517' },
 ]
 
 export default function Lobby() {
@@ -24,6 +24,7 @@ export default function Lobby() {
   const [roomId, setRoomId] = useState<string | null>(null)
   const [opponent, setOpponent] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
+  const [playerCounts, setPlayerCounts] = useState<Record<string, number>>({})
   const { dark, toggleDark } = useTheme()
   const { addToast } = useToast()
 
@@ -41,7 +42,14 @@ export default function Lobby() {
     tagBg: dark ? 'rgba(29,158,117,0.15)' : '#E1F5EE',
   }
 
-  useEffect(() => { loadProfile() }, [])
+  useEffect(() => {
+    loadProfile()
+    // Real-time ενημέρωση player counts
+    const ch = supabase.channel('lobby-rooms')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'game_rooms' }, fetchPlayerCounts)
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [])
 
   useEffect(() => {
     if (screen !== 'matching') return
@@ -56,7 +64,44 @@ export default function Lobby() {
     const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
     setProfile(data)
     if (data?.grade) setGrade(data.grade)
-  await supabase.rpc('cleanup_old_rooms')}
+    await supabase.rpc('cleanup_old_rooms')
+    fetchPlayerCounts()
+  }
+
+  async function fetchPlayerCounts() {
+    // Αριθμός αναμενόμενων παικτών ανά μάθημα (active waiting rooms)
+    const { data: waitingRooms } = await supabase
+      .from('game_rooms')
+      .select('subject')
+      .in('status', ['waiting', 'ready'])
+
+    const liveCounts: Record<string, number> = {}
+    for (const r of waitingRooms || []) {
+      if (r.subject) liveCounts[r.subject] = (liveCounts[r.subject] || 0) + 1
+    }
+
+    // Αν δεν υπάρχουν live rooms, δείξε συνολικούς μοναδικούς παίκτες ανά μάθημα
+    const hasLive = Object.keys(liveCounts).length > 0
+    if (!hasLive) {
+      const { data: games } = await supabase
+        .from('games')
+        .select('subject, player1_id, player2_id')
+      const allCounts: Record<string, Set<string>> = {}
+      for (const g of games || []) {
+        if (!g.subject) continue
+        if (!allCounts[g.subject]) allCounts[g.subject] = new Set()
+        if (g.player1_id) allCounts[g.subject].add(g.player1_id)
+        if (g.player2_id) allCounts[g.subject].add(g.player2_id)
+      }
+      const totals: Record<string, number> = {}
+      for (const [subj, players] of Object.entries(allCounts)) {
+        totals[subj] = players.size
+      }
+      setPlayerCounts(totals)
+    } else {
+      setPlayerCounts(liveCounts)
+    }
+  }
 
   async function findMatch() {
   if (!profile) return
@@ -209,15 +254,20 @@ const pollInterval = setInterval(async () => {
 
             <div style={{ fontSize: 11, fontWeight: 700, color: c.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Μάθημα</div>
             <div className="subject-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, width: '100%', marginBottom: 24 }}>
-              {subjects.map(s => (
-                <button key={s.id} className="subject-btn" onClick={() => setSubject(s.id)} style={{ border: `2px solid ${subject === s.id ? '#1D9E75' : c.btnBorder}`, background: subject === s.id ? c.selectedBg : c.card }}>
-                  <span style={{ fontSize: 20, color: s.color }}>{s.icon}</span>
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: subject === s.id ? '#1D9E75' : c.text }}>{s.name}</div>
-                    <div style={{ fontSize: 11, color: '#1D9E75' }}>{s.players} παίκτες τώρα</div>
-                  </div>
-                </button>
-              ))}
+              {BASE_SUBJECTS.map(s => {
+                const count = playerCounts[s.id] ?? null
+                return (
+                  <button key={s.id} className="subject-btn" onClick={() => setSubject(s.id)} style={{ border: `2px solid ${subject === s.id ? '#1D9E75' : c.btnBorder}`, background: subject === s.id ? c.selectedBg : c.card }}>
+                    <span style={{ fontSize: 20, color: s.color }}>{s.icon}</span>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: subject === s.id ? '#1D9E75' : c.text }}>{s.name}</div>
+                      <div style={{ fontSize: 11, color: count !== null && count > 0 ? '#1D9E75' : c.textMuted }}>
+                        {count === null ? '…' : count > 0 ? `${count} παίκτες τώρα` : 'Παίξε πρώτος!'}
+                      </div>
+                    </div>
+                  </button>
+                )
+              })}
             </div>
 
             <div style={{ fontSize: 11, fontWeight: 700, color: c.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Τρόπος</div>
@@ -242,7 +292,7 @@ const pollInterval = setInterval(async () => {
         {screen === 'matching' && (
           <div style={{ maxWidth: 420, margin: '0 auto', padding: '48px 20px', textAlign: 'center' }}>
             <div style={{ background: c.tagBg, color: '#0F6E56', fontSize: 12, fontWeight: 700, padding: '5px 14px', borderRadius: 20, display: 'inline-block', marginBottom: 28 }}>
-              ● {['Α΄', 'Β΄', 'Γ΄'][grade - 1]} Λυκείου · {subjects.find(s => s.id === subject)?.name}
+              ● {['Α΄', 'Β΄', 'Γ΄'][grade - 1]} Λυκείου · {BASE_SUBJECTS.find(s => s.id === subject)?.name}
             </div>
             <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 8, color: c.text }}>Ψάχνουμε αντίπαλο{dots}</h2>
             <p style={{ fontSize: 14, color: c.textSub, marginBottom: 36 }}>Βρίσκουμε κάποιον με παρόμοιο ELO</p>

@@ -1,9 +1,37 @@
 'use client'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useTheme } from './context/ThemeContext'
+import { supabase } from './lib/supabase'
 
 export default function Home() {
   const { dark, toggleDark } = useTheme()
+  const [userCount, setUserCount] = useState<number | null>(null)
+  const [questionCount, setQuestionCount] = useState<number>(120)
+  const [onlineCount, setOnlineCount] = useState<number>(0)
+
+  useEffect(() => {
+    async function fetchStats() {
+      const [{ count: users }, { count: qs }, { count: rooms }] = await Promise.all([
+        supabase.from('profiles').select('*', { count: 'exact', head: true }),
+        supabase.from('questions').select('*', { count: 'exact', head: true }),
+        supabase.from('game_rooms').select('*', { count: 'exact', head: true }).in('status', ['waiting', 'ready']),
+      ])
+      setUserCount(users ?? 0)
+      setQuestionCount(qs && qs > 0 ? qs : 120)
+      setOnlineCount((rooms ?? 0) * 2)
+    }
+    fetchStats()
+
+    // Real-time: ενημέρωση online badge όταν αλλάζει κάποιο game_room
+    const channel = supabase.channel('landing-rooms')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'game_rooms' }, () => {
+        supabase.from('game_rooms').select('*', { count: 'exact', head: true })
+          .in('status', ['waiting', 'ready'])
+          .then(({ count }) => setOnlineCount((count ?? 0) * 2))
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [])
 
   const c = {
     bg: dark ? '#0A0E14' : '#f9fafb',
@@ -160,7 +188,11 @@ export default function Home() {
             <div style={{ flex: 1 }}>
               <div className="fade-in" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#E1F5EE', color: '#0F6E56', fontSize: 12, fontWeight: 700, padding: '5px 14px', borderRadius: 20, marginBottom: 24 }}>
                 <span className="pulse" style={{ width: 6, height: 6, borderRadius: '50%', background: '#1D9E75', display: 'inline-block' }}></span>
-                318 μαθητές online τώρα
+                {onlineCount > 0
+                  ? `${onlineCount} μαθητές online τώρα`
+                  : userCount !== null && userCount > 0
+                    ? `${userCount.toLocaleString('el-GR')} μαθητές έχουν εγγραφεί`
+                    : 'Γίνε ο πρώτος!'}
               </div>
               <h1 className="fade-in delay-1" style={{ fontSize: 48, fontWeight: 900, letterSpacing: -2, lineHeight: 1.1, marginBottom: 20, color: c.text }}>
                 Διάβασε λιγότερο.<br /><span className="gradient-text">Μάθε περισσότερο.</span>
@@ -211,7 +243,12 @@ export default function Home() {
 
         {/* Stats */}
         <div className="stats-row" style={{ display: 'flex', justifyContent: 'center', borderTop: `1px solid ${c.cardBorder}`, borderBottom: `1px solid ${c.cardBorder}`, background: c.statsBg, marginBottom: 64 }}>
-          {[['12.400+', 'Μαθητές'], ['850+', 'Ερωτήσεις'], ['6', 'Μαθήματα'], ['3', 'Τάξεις']].map(([num, label], i) => (
+          {[
+            [userCount !== null ? userCount.toLocaleString('el-GR') : '…', 'Μαθητές'],
+            [questionCount > 0 ? `${questionCount}` : '120', 'Ερωτήσεις'],
+            ['6', 'Μαθήματα'],
+            ['3', 'Τάξεις'],
+          ].map(([num, label], i) => (
             <div key={label} className={`stat-card fade-in delay-${i + 1}`} style={{ flex: 1, maxWidth: 200, padding: '24px 16px', textAlign: 'center', borderRight: i < 3 ? `1px solid ${c.cardBorder}` : 'none' }}>
               <div style={{ fontSize: 30, fontWeight: 900, color: '#1D9E75', letterSpacing: -1 }}>{num}</div>
               <div style={{ fontSize: 13, color: c.textSub, marginTop: 4 }}>{label}</div>
