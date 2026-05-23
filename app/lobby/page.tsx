@@ -199,7 +199,7 @@ const pollInterval = setInterval(async () => {
             </div>
 
             <div style={{ fontSize: 11, fontWeight: 700, color: c.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Μάθημα</div>
-            <div className="subject-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 24 }}>
+            <div className="subject-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, width: '100%', marginBottom: 24 }}>
               {subjects.map(s => (
                 <button key={s.id} className="subject-btn" onClick={() => setSubject(s.id)} style={{ border: `2px solid ${subject === s.id ? '#1D9E75' : c.btnBorder}`, background: subject === s.id ? c.selectedBg : c.card }}>
                   <span style={{ fontSize: 20, color: s.color }}>{s.icon}</span>

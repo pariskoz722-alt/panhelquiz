@@ -15,8 +15,50 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "PanhelQuiz",
-  description: "Quiz battles για Πανελλήνιες εξετάσεις",
+  title: {
+    default: "PanhelQuiz — Quiz Battles για Πανελλήνιες",
+    template: "%s | PanhelQuiz",
+  },
+  description: "Διάβασε για τις Πανελλήνιες παίζοντας 1v1 quiz battles με άλλους μαθητές. Μαθηματικά, Φυσική, Χημεία, Ιστορία, Βιολογία, Έκθεση.",
+  keywords: ["πανελλήνιες", "quiz", "μαθηματικά λύκειο", "φυσική λύκειο", "προετοιμασία πανελλήνιες", "online quiz", "εξετάσεις λύκειο"],
+  authors: [{ name: "PanhelQuiz" }],
+  creator: "PanhelQuiz",
+  metadataBase: new URL("https://panhelquiz.vercel.app"),
+  openGraph: {
+    type: "website",
+    locale: "el_GR",
+    url: "https://panhelquiz.vercel.app",
+    siteName: "PanhelQuiz",
+    title: "PanhelQuiz — Quiz Battles για Πανελλήνιες",
+    description: "Διάβασε για τις Πανελλήνιες παίζοντας 1v1 quiz battles με άλλους μαθητές.",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "PanhelQuiz — Quiz Battles για Πανελλήνιες",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "PanhelQuiz — Quiz Battles για Πανελλήνιες",
+    description: "Διάβασε για τις Πανελλήνιες παίζοντας 1v1 quiz battles με άλλους μαθητές.",
+    images: ["/og-image.png"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+    },
+  },
+  viewport: {
+    width: "device-width",
+    initialScale: 1,
+    maximumScale: 1,
+  },
 };
 
 export default function RootLayout({
