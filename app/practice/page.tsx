@@ -25,7 +25,7 @@ export default function Practice() {
 
   const c = {
     bg: dark ? '#0A0E14' : '#f9fafb',
-    navBg: dark ? 'rgba(10,14,20,0.95)' : 'rgba(255,255,255,0.95)',
+    navBg: dark ? 'rgba(10,14,20,0.95)' : 'white',
     navBorder: dark ? 'rgba(29,158,117,0.2)' : '#e5e7eb',
     text: dark ? '#fff' : '#111',
     textSub: dark ? 'rgba(255,255,255,0.5)' : '#666',
@@ -35,8 +35,17 @@ export default function Practice() {
     btnBorder: dark ? 'rgba(255,255,255,0.12)' : '#e5e7eb',
     selectedBg: dark ? 'rgba(29,158,117,0.15)' : '#E1F5EE',
     ansBg: dark ? 'rgba(255,255,255,0.05)' : 'white',
+    ansBorder: dark ? 'rgba(255,255,255,0.12)' : '#e5e7eb',
+    tagBg: dark ? 'rgba(255,255,255,0.08)' : '#f3f4f6',
     progressBg: dark ? 'rgba(255,255,255,0.08)' : '#e5e7eb',
   }
+
+  const timerPct = timeLeft / TIME_PER_Q
+  const timerColor = timeLeft <= 5 ? '#E24B4A' : '#1D9E75'
+  const circumference = 125.6
+  const subMeta = subjectMeta[subject]
+  const curQ = questions[cur]
+  const pct = questions.length ? Math.round((correctCount / questions.length) * 100) : 0
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -47,10 +56,7 @@ export default function Practice() {
 
   useEffect(() => {
     if (screen !== 'countdown') return
-    if (countdown === 0) {
-      const t = setTimeout(() => setScreen('game'), 400)
-      return () => clearTimeout(t)
-    }
+    if (countdown === 0) { const t = setTimeout(() => setScreen('game'), 400); return () => clearTimeout(t) }
     const t = setTimeout(() => setCountdown(c => c - 1), 900)
     return () => clearTimeout(t)
   }, [countdown, screen])
@@ -65,15 +71,9 @@ export default function Practice() {
   function startPractice() {
     const qs = pickQuestions(subject, QUESTION_COUNT)
     setQuestions(qs)
-    setCur(0)
-    setSelected(null)
-    setFeedback(null)
-    setTimeLeft(TIME_PER_Q)
-    setScore(0)
-    setCorrectCount(0)
-    setWrongAnswers([])
-    setCountdown(3)
-    setScreen('countdown')
+    setCur(0); setSelected(null); setFeedback(null); setTimeLeft(TIME_PER_Q)
+    setScore(0); setCorrectCount(0); setWrongAnswers([])
+    setCountdown(3); setScreen('countdown')
   }
 
   function handleAnswer(index: number) {
@@ -81,83 +81,81 @@ export default function Practice() {
     const q = questions[cur]
     const isCorrect = index === q.correct
     const bonus = Math.max(timeLeft, 0) * 5
+
     setSelected(index)
-    if (index === -1) {
-      setFeedback('timeout')
-    } else {
-      setFeedback(isCorrect ? 'correct' : 'wrong')
-    }
-    if (isCorrect) {
-      setScore(s => s + 100 + bonus)
-      setCorrectCount(c => c + 1)
-    } else if (index !== -1) {
+    setFeedback(index === -1 ? 'timeout' : isCorrect ? 'correct' : 'wrong')
+
+    if (isCorrect) { setScore(s => s + 100 + bonus); setCorrectCount(c => c + 1) }
+    else {
       setWrongAnswers(w => [...w, {
         q: q.q,
         correct: q.answers[q.correct],
-        chosen: q.answers[index] ?? '—',
+        chosen: index === -1 ? '(χρόνος τέλος)' : q.answers[index],
       }])
-    } else {
-      setWrongAnswers(w => [...w, { q: q.q, correct: q.answers[q.correct], chosen: '(χρόνος τέλος)' }])
     }
+
     setTimeout(() => {
       if (cur + 1 < questions.length) {
-        setCur(c => c + 1)
-        setSelected(null)
-        setFeedback(null)
-        setTimeLeft(TIME_PER_Q)
+        setCur(c => c + 1); setSelected(null); setFeedback(null); setTimeLeft(TIME_PER_Q)
       } else {
         setScreen('results')
       }
     }, 1100)
   }
 
-  const pct = questions.length ? Math.round((correctCount / questions.length) * 100) : 0
-  const subMeta = subjectMeta[subject]
-  const curQ = questions[cur]
-
   return (
     <>
       <style>{`
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
-        .ans-btn { transition: all 0.15s ease; cursor: pointer; font-family: inherit; }
-        .ans-btn:hover:not(:disabled) { transform: translateY(-2px); }
+        .ans-btn {
+          padding: 16px 14px; border-radius: 14px; cursor: pointer; text-align: left;
+          font-family: inherit; font-size: 15px; font-weight: 500;
+          transition: all 0.15s; width: 100%; display: flex; align-items: center; gap: 10px;
+        }
+        .ans-btn:hover:not(:disabled) { border-color: #1D9E75 !important; transform: translateY(-2px); }
+        .ans-btn.correct { border-color: #1D9E75 !important; background: #E1F5EE !important; color: #0F6E56 !important; animation: correctPulse 0.4s ease; }
+        .ans-btn.wrong { border-color: #E24B4A !important; background: #FCEBEB !important; color: #A32D2D !important; animation: shake 0.4s ease; }
+        @keyframes correctPulse { 0%{transform:scale(1)} 50%{transform:scale(1.03)} 100%{transform:scale(1)} }
+        @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }
+        .feedback-bar { border-radius: 12px; padding: 12px 16px; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; animation: slideUp 0.3s ease; }
+        @keyframes slideUp { from{transform:translateY(10px);opacity:0} to{transform:translateY(0);opacity:1} }
+        .countdown-num { font-size: 96px; font-weight: 900; color: #1D9E75; animation: countPulse 0.9s ease; }
+        @keyframes countPulse { 0%{transform:scale(0.7);opacity:0.3} 60%{transform:scale(1.1)} 100%{transform:scale(1);opacity:1} }
+        .q-text-anim { animation: fadeSlide 0.35s ease; }
+        @keyframes fadeSlide { from{transform:translateY(8px);opacity:0} to{transform:translateY(0);opacity:1} }
+        .result-icon { font-size: 56px; animation: bounceIn 0.5s cubic-bezier(0.34,1.56,0.64,1); }
+        @keyframes bounceIn { from{transform:scale(0)} to{transform:scale(1)} }
         .subj-btn { transition: all 0.2s; cursor: pointer; font-family: inherit; }
         .subj-btn:hover { transform: translateY(-2px); }
-        @keyframes countPop {
-          0% { transform: scale(0.7); opacity: 0; }
-          60% { transform: scale(1.15); opacity: 1; }
-          100% { transform: scale(1); opacity: 1; }
-        }
-        @keyframes slideIn {
-          from { opacity: 0; transform: translateY(16px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .slide-in { animation: slideIn 0.3s ease; }
         @media (max-width: 600px) {
+          .answers-grid { grid-template-columns: 1fr !important; }
           .subj-grid { grid-template-columns: 1fr 1fr !important; }
         }
       `}</style>
 
       <main style={{ minHeight: '100vh', background: c.bg, color: c.text, transition: 'background 0.3s ease' }}>
-        {/* Navbar */}
-        <nav style={{ background: c.navBg, backdropFilter: 'blur(10px)', borderBottom: `1px solid ${c.navBorder}`, padding: '0 16px', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100 }}>
-          <div style={{ fontSize: 18, fontWeight: 800, color: c.text }}>Panhel<span style={{ color: '#1D9E75' }}>Quiz</span></div>
-          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-            {[['Dashboard', '/dashboard'], ['Παίξε', '/lobby'], ['Εξάσκηση', '/practice'], ['Leaderboard', '/leaderboard']].map(([n, href]) => (
-              <a key={n} href={href} style={{ padding: '6px 8px', borderRadius: 8, fontSize: 12, fontWeight: 500, color: n === 'Εξάσκηση' ? '#0F6E56' : c.textSub, background: n === 'Εξάσκηση' ? 'rgba(29,158,117,0.12)' : 'transparent', textDecoration: 'none' }}>{n}</a>
-            ))}
-            <button onClick={toggleDark} style={{ marginLeft: 4, padding: '6px 10px', borderRadius: 20, border: `1px solid ${c.cardBorder}`, background: dark ? 'rgba(255,255,255,0.08)' : '#f3f4f6', color: c.text, fontSize: 15, cursor: 'pointer' }}>
-              {dark ? '☀️' : '🌙'}
-            </button>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <NotificationBell />
-            <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#1D9E75', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>
-              {profile?.username?.[0]?.toUpperCase() || 'Π'}
+
+        {/* Navbar — only on select screen */}
+        {screen === 'select' && (
+          <nav style={{ background: c.navBg, backdropFilter: 'blur(10px)', borderBottom: `1px solid ${c.navBorder}`, padding: '0 16px', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100 }}>
+            <div style={{ fontSize: 18, fontWeight: 800, color: c.text }}>Panhel<span style={{ color: '#1D9E75' }}>Quiz</span></div>
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+              {[['Dashboard', '/dashboard'], ['Παίξε', '/lobby'], ['Εξάσκηση', '/practice'], ['Leaderboard', '/leaderboard']].map(([n, href]) => (
+                <a key={n} href={href} style={{ padding: '6px 8px', borderRadius: 8, fontSize: 12, fontWeight: 500, color: n === 'Εξάσκηση' ? '#0F6E56' : c.textSub, background: n === 'Εξάσκηση' ? 'rgba(29,158,117,0.12)' : 'transparent', textDecoration: 'none' }}>{n}</a>
+              ))}
+              <button onClick={toggleDark} style={{ marginLeft: 4, padding: '6px 10px', borderRadius: 20, border: `1px solid ${c.cardBorder}`, background: dark ? 'rgba(255,255,255,0.08)' : '#f3f4f6', color: c.text, fontSize: 15, cursor: 'pointer' }}>
+                {dark ? '☀️' : '🌙'}
+              </button>
             </div>
-          </div>
-        </nav>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <NotificationBell />
+              <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#1D9E75', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>
+                {profile?.username?.[0]?.toUpperCase() || 'Π'}
+              </div>
+            </div>
+          </nav>
+        )}
 
         {/* SELECT SUBJECT */}
         {screen === 'select' && (
@@ -173,21 +171,21 @@ export default function Practice() {
                   background: subject === id ? c.selectedBg : c.card, display: 'flex', alignItems: 'center', gap: 10,
                 }}>
                   <span style={{ fontSize: 22, color: meta.color }}>{meta.icon}</span>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: subject === id ? '#1D9E75' : c.text, textAlign: 'left' }}>{meta.name}</div>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: subject === id ? '#1D9E75' : c.text }}>{meta.name}</span>
                 </button>
               ))}
             </div>
 
             <div style={{ background: c.card, border: `1px solid ${c.cardBorder}`, borderRadius: 12, padding: '14px 18px', marginBottom: 24, display: 'flex', gap: 20, flexWrap: 'wrap' }}>
               {[['📚', `${QUESTION_COUNT} ερωτήσεις`], ['⏱', `${TIME_PER_Q}δλ/ερώτηση`], ['🎯', 'Χωρίς ELO αλλαγή']].map(([icon, label]) => (
-                <span key={label} style={{ fontSize: 13, color: c.textSub }}>{icon} {label}</span>
+                <span key={String(label)} style={{ fontSize: 13, color: c.textSub }}>{icon} {label}</span>
               ))}
             </div>
 
             <button onClick={startPractice} style={{
               width: '100%', padding: '16px', background: 'linear-gradient(135deg, #1D9E75, #0F6E56)',
               color: 'white', border: 'none', borderRadius: 14, fontSize: 17, fontWeight: 800,
-              cursor: 'pointer', boxShadow: '0 6px 20px rgba(29,158,117,0.35)',
+              cursor: 'pointer', boxShadow: '0 6px 20px rgba(29,158,117,0.35)', fontFamily: 'inherit',
             }}>
               ▶ Ξεκίνα εξάσκηση
             </button>
@@ -196,142 +194,145 @@ export default function Practice() {
 
         {/* COUNTDOWN */}
         {screen === 'countdown' && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '80vh', flexDirection: 'column', gap: 20 }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: c.textSub }}>
-              {subMeta.icon} {subMeta.name} · {QUESTION_COUNT} ερωτήσεις
+          <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: 20 }}>
+            <div style={{ position: 'absolute', top: 16, right: 16 }}>
+              <button onClick={toggleDark} style={{ padding: '6px 12px', borderRadius: 20, border: `1px solid ${c.cardBorder}`, background: dark ? 'rgba(255,255,255,0.08)' : '#f3f4f6', color: c.text, fontSize: 16, cursor: 'pointer' }}>
+                {dark ? '☀️' : '🌙'}
+              </button>
             </div>
-            <div key={countdown} style={{
-              width: 140, height: 140, borderRadius: '50%',
-              background: 'linear-gradient(135deg, #1D9E75, #0D6B4F)',
-              color: 'white', fontSize: 68, fontWeight: 900,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 20px 60px rgba(29,158,117,0.35)',
-              animation: 'countPop 0.9s ease',
-            }}>
-              {countdown || 'GO'}
+
+            <div style={{ background: '#E1F5EE', color: '#0F6E56', fontSize: 12, fontWeight: 700, padding: '4px 14px', borderRadius: 20, marginBottom: 28 }}>
+              Εξάσκηση Solo
+            </div>
+
+            <div style={{ marginBottom: 32, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+              <div style={{ width: 72, height: 72, borderRadius: '50%', background: '#1D9E75', color: 'white', fontSize: 24, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {profile?.username?.[0]?.toUpperCase() || 'Π'}
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: c.text }}>{profile?.username || 'Εσύ'}</div>
+              <div style={{ fontSize: 12, color: c.textSub }}>ELO {profile?.elo || 1200}</div>
+            </div>
+
+            <div className="countdown-num" key={countdown}>{countdown || 'GO!'}</div>
+            <div style={{ fontSize: 16, color: c.textSub, marginTop: 12 }}>Ετοιμαστείτε!</div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 24, flexWrap: 'wrap', justifyContent: 'center' }}>
+              {[`${subMeta.icon} ${subMeta.name}`, `${QUESTION_COUNT} ερωτήσεις`, `${TIME_PER_Q}δλ/ερώτηση`, 'Solo'].map(t => (
+                <div key={t} style={{ background: c.card, border: `1px solid ${c.cardBorder}`, borderRadius: 20, padding: '4px 12px', fontSize: 12, fontWeight: 600, color: c.textSub }}>{t}</div>
+              ))}
             </div>
           </div>
         )}
 
         {/* GAME */}
         {screen === 'game' && curQ && (
-          <div className="slide-in" key={cur} style={{ maxWidth: 640, margin: '0 auto', padding: '28px 16px' }}>
-            {/* Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#1D9E75' }}>
-                {subMeta.icon} {subMeta.name} · {cur + 1}/{questions.length}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span style={{ fontSize: 13, color: c.textSub }}>Σκορ: <strong style={{ color: c.text }}>{score}</strong></span>
-                <div style={{
-                  width: 42, height: 42, borderRadius: '50%',
-                  background: timeLeft <= 5 ? 'rgba(239,68,68,0.15)' : 'rgba(29,158,117,0.15)',
-                  border: `2px solid ${timeLeft <= 5 ? '#ef4444' : '#1D9E75'}`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 14, fontWeight: 800, color: timeLeft <= 5 ? '#ef4444' : '#1D9E75',
-                }}>
-                  {timeLeft}
+          <>
+            {/* Scorebar */}
+            <div style={{ background: c.navBg, borderBottom: `1px solid ${c.navBorder}`, padding: '10px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
+                <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#1D9E75', color: 'white', fontSize: 13, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {profile?.username?.[0]?.toUpperCase() || 'Π'}
                 </div>
+                <div>
+                  <div style={{ fontSize: 12, color: c.textSub }}>Σκορ</div>
+                  <div style={{ fontSize: 22, fontWeight: 900, color: '#1D9E75' }}>{score}</div>
+                </div>
+              </div>
+
+              {/* Circular timer */}
+              <div style={{ position: 'relative', width: 52, height: 52 }}>
+                <svg width="52" height="52" style={{ transform: 'rotate(-90deg)' }}>
+                  <circle cx="26" cy="26" r="20" fill="none" stroke={c.progressBg} strokeWidth="4"/>
+                  <circle cx="26" cy="26" r="20" fill="none" stroke={timerColor} strokeWidth="4"
+                    strokeDasharray={circumference} strokeDashoffset={circumference * (1 - timerPct)}
+                    strokeLinecap="round" style={{ transition: 'stroke-dashoffset 0.9s linear, stroke 0.3s' }}/>
+                </svg>
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 900, color: timerColor }}>{timeLeft}</div>
+              </div>
+
+              <div style={{ flex: 1, textAlign: 'right' }}>
+                <div style={{ fontSize: 12, color: c.textSub }}>{subMeta.icon} {subMeta.name}</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: c.textMuted }}>{cur + 1} / {questions.length}</div>
               </div>
             </div>
 
             {/* Progress bar */}
-            <div style={{ height: 6, background: c.progressBg, borderRadius: 99, overflow: 'hidden', marginBottom: 20 }}>
-              <div style={{ width: `${((cur) / questions.length) * 100}%`, height: '100%', background: 'linear-gradient(90deg, #1D9E75, #22c55e)', transition: 'width 0.3s ease' }} />
+            <div style={{ height: 3, background: c.progressBg }}>
+              <div style={{ height: '100%', width: `${(cur / questions.length) * 100}%`, background: 'linear-gradient(90deg, #1D9E75, #0F6E56)', transition: 'width 0.4s' }} />
             </div>
 
-            {/* Question card */}
-            <div style={{ background: c.card, border: `1px solid ${c.cardBorder}`, borderRadius: 20, padding: '24px 20px', marginBottom: 16, boxShadow: dark ? '0 8px 32px rgba(0,0,0,0.3)' : '0 8px 32px rgba(0,0,0,0.08)' }}>
-              <div style={{ fontSize: 20, fontWeight: 700, color: c.text, lineHeight: 1.4, marginBottom: 24 }}>
+            {/* Question */}
+            <div style={{ maxWidth: 560, margin: '0 auto', padding: '24px 20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <span style={{ background: c.tagBg, borderRadius: 20, padding: '3px 10px', fontSize: 12, fontWeight: 700, color: c.textSub }}>Ερώτηση {cur + 1}/{questions.length}</span>
+              </div>
+
+              <div className="q-text-anim" key={cur} style={{ fontSize: 20, fontWeight: 700, color: c.text, lineHeight: 1.4, marginBottom: 20 }}>
                 {curQ.q}
               </div>
 
-              <div style={{ display: 'grid', gap: 10 }}>
-                {curQ.answers.map((ans, i) => {
+              <div className="answers-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+                {curQ.answers.map((a, i) => {
                   const isCorrect = i === curQ.correct
-                  const isSelected = selected === i
-                  const showCorrect = selected !== null && isCorrect
-                  const showWrong = selected !== null && isSelected && !isCorrect
+                  let cls = 'ans-btn'
+                  if (selected !== null) {
+                    if (isCorrect) cls += ' correct'
+                    else if (i === selected) cls += ' wrong'
+                  }
                   return (
-                    <button
-                      key={ans}
-                      className="ans-btn"
-                      disabled={selected !== null}
-                      onClick={() => handleAnswer(i)}
-                      style={{
-                        padding: '14px 16px', borderRadius: 12, textAlign: 'left', fontSize: 15, fontWeight: 600,
-                        border: showCorrect ? '1.5px solid #1D9E75' : showWrong ? '1.5px solid #ef4444' : `1px solid ${c.cardBorder}`,
-                        background: showCorrect ? '#1D9E75' : showWrong ? '#ef4444' : c.ansBg,
-                        color: showCorrect || showWrong ? 'white' : c.text,
-                      }}
-                    >
-                      <span style={{ opacity: 0.55, marginRight: 10 }}>{String.fromCharCode(65 + i)}.</span>
-                      {ans}
+                    <button key={i} className={cls} onClick={() => handleAnswer(i)} disabled={selected !== null}
+                      style={{ background: c.ansBg, border: `2px solid ${c.ansBorder}`, color: c.text }}>
+                      <div style={{ width: 26, height: 26, borderRadius: '50%', background: c.tagBg, color: c.textSub, fontSize: 12, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        {['Α', 'Β', 'Γ', 'Δ'][i]}
+                      </div>
+                      {a}
                     </button>
                   )
                 })}
               </div>
-            </div>
 
-            {feedback && (
-              <div style={{
-                padding: '12px 16px', borderRadius: 12,
-                background: feedback === 'correct' ? 'rgba(29,158,117,0.12)' : 'rgba(239,68,68,0.12)',
-                color: feedback === 'correct' ? '#1D9E75' : '#ef4444',
-                fontWeight: 700, fontSize: 14,
-                animation: 'slideIn 0.2s ease',
-              }}>
-                {feedback === 'correct' ? `✓ Σωστό! +${100 + timeLeft * 5} πόντοι` : feedback === 'timeout' ? `⏱ Χρόνος τέλος! Σωστό: ${curQ.answers[curQ.correct]}` : `✗ Λάθος! Σωστό: ${curQ.answers[curQ.correct]}`}
-              </div>
-            )}
-          </div>
+              {feedback && (
+                <div className="feedback-bar" style={{ background: feedback === 'correct' ? '#E1F5EE' : feedback === 'wrong' ? '#FCEBEB' : '#FAEEDA', color: feedback === 'correct' ? '#0F6E56' : feedback === 'wrong' ? '#A32D2D' : '#633806' }}>
+                  {feedback === 'correct' ? `✓ Σωστό! +${100 + timeLeft * 5} πόντοι` : feedback === 'wrong' ? `✗ Λάθος! Σωστό: ${curQ.answers[curQ.correct]}` : `⏱ Τέλος χρόνου! Σωστό: ${curQ.answers[curQ.correct]}`}
+                </div>
+              )}
+            </div>
+          </>
         )}
 
         {/* RESULTS */}
         {screen === 'results' && (
-          <div style={{ maxWidth: 580, margin: '0 auto', padding: '32px 16px' }}>
-            <div style={{ background: c.card, border: `1px solid ${c.cardBorder}`, borderRadius: 20, padding: '28px 24px', marginBottom: 16, textAlign: 'center' }}>
-              <div style={{ fontSize: 52, marginBottom: 12 }}>
-                {pct >= 80 ? '🏆' : pct >= 60 ? '💪' : '📖'}
-              </div>
-              <h1 style={{ fontSize: 26, fontWeight: 900, marginBottom: 8, color: c.text }}>
-                {pct >= 80 ? 'Εξαιρετικό!' : pct >= 60 ? 'Καλή δουλειά!' : 'Συνέχισε την εξάσκηση!'}
-              </h1>
-              <p style={{ fontSize: 15, color: c.textSub, marginBottom: 24 }}>
+          <div style={{ maxWidth: 480, margin: '0 auto', padding: '40px 20px 60px' }}>
+            <div style={{ textAlign: 'center' }}>
+              <div className="result-icon">{pct >= 80 ? '🏆' : pct >= 60 ? '💪' : '📖'}</div>
+              <h2 style={{ fontSize: 28, fontWeight: 900, color: c.text, margin: '12px 0 4px' }}>
+                {pct >= 80 ? 'Εξαιρετικό!' : pct >= 60 ? 'Καλή δουλειά!' : 'Συνέχισε!'}
+              </h2>
+              <p style={{ fontSize: 14, color: c.textSub, marginBottom: 28 }}>
                 {subMeta.icon} {subMeta.name} · {correctCount}/{questions.length} σωστές
               </p>
 
-              <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginBottom: 24, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginBottom: 20 }}>
                 {[
-                  { label: 'Σκορ', val: score, color: '#1D9E75' },
-                  { label: 'Σωστές', val: `${correctCount}/${questions.length}`, color: '#378ADD' },
-                  { label: 'Ποσοστό', val: `${pct}%`, color: pct >= 60 ? '#1D9E75' : '#ef4444' },
+                  { label: 'Σκορ', val: String(score), color: '#1D9E75', bg: dark ? 'rgba(29,158,117,0.15)' : '#E1F5EE' },
+                  { label: 'Σωστές', val: `${correctCount}/${questions.length}`, color: '#185FA5', bg: dark ? 'rgba(24,95,165,0.15)' : '#E6F1FB' },
+                  { label: 'Ποσοστό', val: `${pct}%`, color: pct >= 60 ? '#1D9E75' : '#E24B4A', bg: dark ? 'rgba(255,255,255,0.04)' : '#f9fafb' },
                 ].map(s => (
-                  <div key={s.label} style={{ flex: 1, minWidth: 90, background: dark ? 'rgba(255,255,255,0.04)' : '#f9fafb', border: `1px solid ${c.cardBorder}`, borderRadius: 12, padding: '12px 8px' }}>
-                    <div style={{ fontSize: 22, fontWeight: 900, color: s.color }}>{s.val}</div>
-                    <div style={{ fontSize: 11, color: c.textMuted }}>{s.label}</div>
+                  <div key={s.label} style={{ flex: 1, background: s.bg, border: `1px solid ${s.color}33`, borderRadius: 16, padding: '20px 12px' }}>
+                    <div style={{ fontSize: 13, color: c.textSub, marginBottom: 6 }}>{s.label}</div>
+                    <div style={{ fontSize: 30, fontWeight: 900, color: s.color }}>{s.val}</div>
                   </div>
                 ))}
               </div>
 
-              <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
-                <button onClick={startPractice} style={{
-                  padding: '12px 22px', background: 'linear-gradient(135deg, #1D9E75, #0F6E56)',
-                  color: 'white', border: 'none', borderRadius: 12, fontSize: 14, fontWeight: 800, cursor: 'pointer',
-                }}>
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 28 }}>
+                <button onClick={startPractice} style={{ flex: 1, maxWidth: 160, padding: '14px', background: 'linear-gradient(135deg, #1D9E75, #0F6E56)', color: 'white', border: 'none', borderRadius: 12, fontSize: 15, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
                   ↺ Ξανά
                 </button>
-                <button onClick={() => setScreen('select')} style={{
-                  padding: '12px 22px', background: 'transparent',
-                  color: c.text, border: `1.5px solid ${c.cardBorder}`, borderRadius: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer',
-                }}>
+                <button onClick={() => setScreen('select')} style={{ padding: '14px 20px', background: c.card, color: c.text, border: `1px solid ${c.cardBorder}`, borderRadius: 12, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
                   Αλλαγή μαθήματος
                 </button>
-                <a href="/lobby" style={{
-                  padding: '12px 22px', background: dark ? 'rgba(255,255,255,0.08)' : '#f3f4f6',
-                  color: c.text, border: `1px solid ${c.cardBorder}`, borderRadius: 12, fontSize: 14, fontWeight: 700, textDecoration: 'none', display: 'inline-block',
-                }}>
-                  ⚔️ 1v1 Ranked
+                <a href="/lobby" style={{ padding: '14px 20px', background: c.card, color: c.textSub, border: `1px solid ${c.cardBorder}`, borderRadius: 12, fontSize: 15, textDecoration: 'none', fontWeight: 500, display: 'inline-flex', alignItems: 'center' }}>
+                  ⚔️ 1v1
                 </a>
               </div>
             </div>
@@ -343,7 +344,7 @@ export default function Practice() {
                 {wrongAnswers.map((w, i) => (
                   <div key={i} style={{ marginBottom: 14, paddingBottom: 14, borderBottom: i < wrongAnswers.length - 1 ? `1px solid ${c.cardBorder}` : 'none' }}>
                     <div style={{ fontSize: 13, color: c.text, fontWeight: 600, marginBottom: 6 }}>{w.q}</div>
-                    <div style={{ fontSize: 12, color: '#ef4444' }}>Απάντησες: {w.chosen}</div>
+                    <div style={{ fontSize: 12, color: '#E24B4A' }}>Απάντησες: {w.chosen}</div>
                     <div style={{ fontSize: 12, color: '#1D9E75', fontWeight: 700 }}>Σωστό: {w.correct}</div>
                   </div>
                 ))}
