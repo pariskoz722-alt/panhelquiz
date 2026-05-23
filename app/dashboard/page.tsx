@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useTheme } from '../context/ThemeContext'
 import { supabase } from '../lib/supabase'
 import NotificationBell from '../components/NotificationBell'
+import { subjectMeta } from '../lib/questions'
 
 export default function Dashboard() {
   const [menuOpen, setMenuOpen] = useState(false)
@@ -10,6 +11,7 @@ export default function Dashboard() {
   const [profile, setProfile] = useState<any>(null)
   const [recentGames, setRecentGames] = useState<any[]>([])
   const [leaderboard, setLeaderboard] = useState<any[]>([])
+  const [subjectStats, setSubjectStats] = useState<Record<string, { wins: number; losses: number }>>({})
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -47,6 +49,20 @@ export default function Dashboard() {
       .order('created_at', { ascending: false })
       .limit(4)
     setRecentGames(games || [])
+
+    // Per-subject stats from all games
+    const { data: allGames } = await supabase
+      .from('games')
+      .select('subject, winner_id, player1_id, player2_id')
+      .or(`player1_id.eq.${user.id},player2_id.eq.${user.id}`)
+    const stats: Record<string, { wins: number; losses: number }> = {}
+    for (const g of allGames || []) {
+      if (!g.subject) continue
+      if (!stats[g.subject]) stats[g.subject] = { wins: 0, losses: 0 }
+      if (g.winner_id === user.id) stats[g.subject].wins++
+      else stats[g.subject].losses++
+    }
+    setSubjectStats(stats)
 
     setLoading(false)
   }
@@ -97,6 +113,7 @@ export default function Dashboard() {
           {[
             { label: 'Dashboard', href: '/dashboard', active: true },
             { label: 'Παίξε', href: '/lobby' },
+            { label: 'Εξάσκηση', href: '/practice' },
             { label: 'Leaderboard', href: '/leaderboard' },
             { label: 'Profile', href: '/profile' },
           ].map(link => (
@@ -122,7 +139,7 @@ export default function Dashboard() {
       {menuOpen && (
         <>
           <div style={{ position: 'fixed', top: 52, left: 0, right: 0, zIndex: 99, background: c.navBg, borderBottom: `1px solid ${c.navBorder}`, padding: '8px 16px', display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Παίξε', href: '/lobby' }, { label: 'Leaderboard', href: '/leaderboard' }, { label: 'Profile', href: '/profile' }].map(link => (
+            {[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Παίξε', href: '/lobby' }, { label: 'Εξάσκηση', href: '/practice' }, { label: 'Leaderboard', href: '/leaderboard' }, { label: 'Profile', href: '/profile' }].map(link => (
               <a key={link.href} href={link.href} style={{ padding: '12px 16px', borderRadius: 8, fontSize: 15, fontWeight: 600, color: c.text, textDecoration: 'none' }} onClick={() => setMenuOpen(false)}>{link.label}</a>
             ))}
             <button onClick={toggleDark} style={{ padding: '12px 16px', borderRadius: 8, fontSize: 15, fontWeight: 600, background: 'none', border: 'none', color: c.text, cursor: 'pointer', textAlign: 'left' }}>
@@ -167,6 +184,40 @@ export default function Dashboard() {
                 <div style={{ fontSize: 11, color: c.textMuted, marginTop: 2 }}>{s.sub}</div>
               </div>
             ))}
+          </div>
+
+          {/* Per-subject stats */}
+          <div style={{ background: c.card, border: `1px solid ${c.cardBorder}`, borderRadius: 12, padding: 16, marginBottom: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: c.text }}>📊 Στατιστικά ανά μάθημα</div>
+              <a href="/practice" style={{ fontSize: 12, fontWeight: 700, color: '#1D9E75', textDecoration: 'none' }}>Εξάσκηση →</a>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+              {Object.entries(subjectMeta).map(([id, meta]) => {
+                const s = subjectStats[id]
+                const total = s ? s.wins + s.losses : 0
+                const wr = total > 0 ? Math.round((s.wins / total) * 100) : null
+                return (
+                  <div key={id} style={{ background: dark ? 'rgba(255,255,255,0.03)' : '#f9fafb', border: `1px solid ${c.cardBorder}`, borderRadius: 10, padding: '10px 12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                      <span style={{ fontSize: 14, color: meta.color }}>{meta.icon}</span>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: c.text }}>{meta.name}</span>
+                    </div>
+                    {total === 0 ? (
+                      <div style={{ fontSize: 11, color: c.textMuted }}>Δεν έχεις παίξει</div>
+                    ) : (
+                      <>
+                        <div style={{ fontSize: 10, color: c.textMuted, marginBottom: 4 }}>{s.wins}Ν · {s.losses}Η · {total} παρτίδες</div>
+                        <div style={{ height: 4, background: dark ? 'rgba(255,255,255,0.08)' : '#e5e7eb', borderRadius: 99, overflow: 'hidden' }}>
+                          <div style={{ width: `${wr}%`, height: '100%', background: wr !== null && wr >= 50 ? '#1D9E75' : '#ef4444', borderRadius: 99 }} />
+                        </div>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: wr !== null && wr >= 50 ? '#1D9E75' : '#ef4444', marginTop: 4 }}>{wr}%</div>
+                      </>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
           </div>
 
           {/* Leaderboard + Recent */}

@@ -3,51 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useTheme } from '../context/ThemeContext'
 import { supabase } from '../lib/supabase'
 import { useToast } from '../components/Toast'
-
-const questionsBySubject: Record<string, { q: string; answers: string[]; correct: number }[]> = {
-  math: [
-    { q: "Ποιο είναι το παράγωγο του f(x) = x³ + 2x;", answers: ["3x² + 2", "3x² − 2", "x² + 2", "3x + 2"], correct: 0 },
-    { q: "Αν log₂(x) = 5, τότε x =", answers: ["10", "32", "25", "16"], correct: 1 },
-    { q: "Λύσε: 2x² − 8 = 0. Ποια η θετική λύση;", answers: ["x = 4", "x = 2", "x = √2", "x = 2√2"], correct: 1 },
-    { q: "Αν sin(θ) = 0.5, τότε θ =", answers: ["30°", "45°", "60°", "90°"], correct: 0 },
-    { q: "Ποιος ο τύπος εμβαδού κύκλου;", answers: ["2πr", "πr²", "πr³/3", "2πr²"], correct: 1 },
-  ],
-  physics: [
-    { q: "Ποια η μονάδα μέτρησης της δύναμης;", answers: ["Joule", "Newton", "Watt", "Pascal"], correct: 1 },
-    { q: "Ποια η ταχύτητα του φωτός στο κενό;", answers: ["3×10⁸ m/s", "3×10⁶ m/s", "3×10⁵ m/s", "3×10¹⁰ m/s"], correct: 0 },
-    { q: "F = ma είναι ο νόμος του;", answers: ["Ohm", "Newton", "Einstein", "Faraday"], correct: 1 },
-    { q: "Ποια η μονάδα ενέργειας;", answers: ["Newton", "Pascal", "Joule", "Watt"], correct: 2 },
-    { q: "Τι μετράει το αμπερόμετρο;", answers: ["Τάση", "Αντίσταση", "Ισχύ", "Ένταση ρεύματος"], correct: 3 },
-  ],
-  chemistry: [
-    { q: "Ποιος ο ατομικός αριθμός του Οξυγόνου;", answers: ["6", "7", "8", "9"], correct: 2 },
-    { q: "Χημικός τύπος νερού;", answers: ["H₂O₂", "HO", "H₂O", "H₃O"], correct: 2 },
-    { q: "Τι είναι το pH = 7;", answers: ["Όξινο", "Βασικό", "Ουδέτερο", "Αλκαλικό"], correct: 2 },
-    { q: "Χημικό σύμβολο χρυσού;", answers: ["Go", "Gl", "Gd", "Au"], correct: 3 },
-    { q: "Πόσα στοιχεία έχει ο περιοδικός πίνακας;", answers: ["108", "112", "118", "124"], correct: 2 },
-  ],
-  history: [
-    { q: "Πότε ξεκίνησε ο Β' Παγκόσμιος Πόλεμος;", answers: ["1937", "1938", "1939", "1940"], correct: 2 },
-    { q: "Ποιος ήταν ο πρώτος Πρόεδρος των ΗΠΑ;", answers: ["Lincoln", "Washington", "Jefferson", "Adams"], correct: 1 },
-    { q: "Πότε έγινε η Γαλλική Επανάσταση;", answers: ["1776", "1789", "1799", "1815"], correct: 1 },
-    { q: "Ποιος κατέκτησε την Κωνσταντινούπολη το 1453;", answers: ["Σελίμ Α'", "Βαγιαζήτ", "Μωάμεθ Β'", "Σουλεϊμάν"], correct: 2 },
-    { q: "Πότε έγινε η Ελληνική Επανάσταση;", answers: ["1814", "1821", "1827", "1830"], correct: 1 },
-  ],
-  biology: [
-    { q: "Ποιο οργανίδιο είναι η 'δύναμη' του κυττάρου;", answers: ["Πυρήνας", "Ριβόσωμα", "Μιτοχόνδριο", "Γολγιανό"], correct: 2 },
-    { q: "Πόσα ζεύγη χρωμοσωμάτων έχει ο άνθρωπος;", answers: ["22", "23", "24", "46"], correct: 1 },
-    { q: "Τι κωδικοποιεί το DNA;", answers: ["Λίπη", "Πρωτεΐνες", "Υδατάνθρακες", "Βιταμίνες"], correct: 1 },
-    { q: "Ποια η διαδικασία σύνθεσης τροφής στα φυτά;", answers: ["Αναπνοή", "Μεταβολισμός", "Φωτοσύνθεση", "Ζύμωση"], correct: 2 },
-    { q: "Ποιο είναι το μεγαλύτερο κύτταρο;", answers: ["Νευρώνας", "Ωάριο", "Ερυθροκύτταρο", "Μυϊκό κύτταρο"], correct: 1 },
-  ],
-  lit: [
-    { q: "Ποιος έγραψε την Οδύσσεια;", answers: ["Σοφοκλής", "Ευριπίδης", "Όμηρος", "Αισχύλος"], correct: 2 },
-    { q: "Ποιο είδος λόγου είναι η Ιλιάδα;", answers: ["Λυρική ποίηση", "Έπος", "Τραγωδία", "Κωμωδία"], correct: 1 },
-    { q: "Τι είναι το χιαστί σχήμα;", answers: ["Επανάληψη", "Αντίθεση", "Σχήμα διάταξης", "Μεταφορά"], correct: 2 },
-    { q: "Ποιος είναι ο κεντρικός ήρωας της Οδύσσειας;", answers: ["Αχιλλέας", "Αγαμέμνονας", "Οδυσσέας", "Τηλέμαχος"], correct: 2 },
-    { q: "Τι είναι η μεταφορά;", answers: ["Σύγκριση με το 'σαν'", "Μεταφορική χρήση λέξης", "Επανάληψη", "Ειρωνεία"], correct: 1 },
-  ],
-}
+import { pickQuestions } from '../lib/questions'
 
 const QUICK_REACTIONS = ['👏', '🔥', '😤', '🤝', '💪', '😂']
 
@@ -74,7 +30,7 @@ export default function Game() {
   const [myProfile, setMyProfile] = useState<any>(null)
   const [oppProfile, setOppProfile] = useState<any>(null)
   const [isPlayer1, setIsPlayer1] = useState(false)
-  const [questions, setQuestions] = useState(questionsBySubject.math)
+  const [questions, setQuestions] = useState<{ q: string; answers: string[]; correct: number }[]>([])
 
   // Chat state
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
@@ -146,7 +102,7 @@ export default function Game() {
     if (shuffled.length > 0) {
       setQuestions(shuffled.map(q => ({ q: q.question, answers: q.answers, correct: q.correct_index })))
     } else {
-      setQuestions(questionsBySubject[roomData.subject] || questionsBySubject.math)
+      setQuestions(pickQuestions(roomData.subject))
     }
 
     supabase
