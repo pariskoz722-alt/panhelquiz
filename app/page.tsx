@@ -59,6 +59,22 @@ export default function Home() {
           text-decoration: none; display: inline-block; transition: all 0.2s;
         }
         .btn-secondary:hover { border-color: #1D9E75 !important; color: #1D9E75 !important; transform: translateY(-2px); }
+        .btn-demo {
+          background: transparent;
+          color: #1D9E75;
+          border: 1.5px solid #1D9E75;
+          padding: 14px 28px;
+          border-radius: 12px;
+          font-size: 16px;
+          font-weight: 700;
+          text-decoration: none;
+          display: inline-block;
+          transition: all 0.2s;
+        }
+        .btn-demo:hover {
+          background: rgba(29,158,117,0.1);
+          transform: translateY(-2px);
+        }
         .feature-card { border-radius: 16px; padding: 24px; transition: all 0.3s; }
         .feature-card:hover { transform: translateY(-6px); box-shadow: 0 12px 40px rgba(0,0,0,0.1); border-color: #1D9E75 !important; }
         .stat-card { transition: all 0.3s; }
@@ -153,7 +169,8 @@ export default function Home() {
                 Παίξε 1v1 quiz με συμμαθητές σου στα μαθήματα των Πανελληνίων. Ανέβα στη βαθμολογία και μάθε χωρίς να το καταλαβαίνεις.
               </p>
               <div className="fade-in delay-3" style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                <a href="/login" className="btn-primary">▶ Παίξε τώρα — δωρεάν</a>
+                <a href="/demo" className="btn-primary">▶ Παίξε demo χωρίς login</a>
+                <a href="/login" className="btn-demo">Εγγραφή / Σύνδεση</a>
                 <a href="#how" className="btn-secondary" style={{ background: c.card, color: c.text, border: `1.5px solid ${c.cardBorder}` }}>Πώς λειτουργεί ↓</a>
               </div>
               <div className="fade-in delay-4" style={{ marginTop: 24, display: 'flex', gap: 20, flexWrap: 'wrap' }}>
@@ -230,7 +247,7 @@ export default function Home() {
           <p className="fade-in" style={{ textAlign: 'center', fontSize: 16, color: c.textSub, marginBottom: 48 }}>Τρία βήματα και είσαι μέσα.</p>
           <div className="steps-row" style={{ display: 'flex', gap: 32, maxWidth: 700, margin: '0 auto', justifyContent: 'center' }}>
             {[
-              { num: '1', title: 'Εγγραφή', desc: 'Δημιούργησε λογαριασμό, διάλεξε τάξη και μάθημα.', delay: 'delay-1' },
+              { num: '1', title: 'Δοκίμασε ή κάνε εγγραφή', desc: 'Παίξε demo χωρίς λογαριασμό ή δημιούργησε προφίλ για να κρατάς πρόοδο.', delay: 'delay-1' },
               { num: '2', title: 'Matchmaking', desc: 'Το σύστημα βρίσκει αντίπαλο του ίδιου επιπέδου μέσα σε δευτερόλεπτα.', delay: 'delay-2' },
               { num: '3', title: 'Παίξε & Ανέβα', desc: 'Απάντησε 5 ερωτήσεις, κέρδισε πόντους ELO, ανέβα στο leaderboard.', delay: 'delay-3' },
             ].map(s => (
@@ -260,22 +277,23 @@ export default function Home() {
         {/* CTA */}
         <div className="cta-section fade-in" style={{ background: 'linear-gradient(135deg, #1D9E75, #0F6E56)', margin: '0 32px 48px', borderRadius: 20, padding: '52px 32px', textAlign: 'center' }}>
           <h2 style={{ fontSize: 30, fontWeight: 900, color: 'white', marginBottom: 8 }}>Έτοιμος να παίξεις;</h2>
-          <p style={{ fontSize: 16, color: 'rgba(255,255,255,0.8)', marginBottom: 28 }}>Εγγραφή δωρεάν. Χωρίς πιστωτική κάρτα. Χωρίς δικαιολογίες.</p>
-          <a href="/login" style={{ background: 'white', color: '#0F6E56', padding: '14px 36px', borderRadius: 12, fontSize: 16, fontWeight: 800, textDecoration: 'none', display: 'inline-block', boxShadow: '0 4px 20px rgba(0,0,0,0.15)' }}>Ξεκίνα τώρα →</a>
+          <p style={{ fontSize: 16, color: 'rgba(255,255,255,0.8)', marginBottom: 28 }}>Μπες κατευθείαν σε δοκιμαστικό quiz ή φτιάξε λογαριασμό για να κρατάς ELO και στατιστικά.</p>
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <a href="/demo" style={{ background: 'white', color: '#0F6E56', padding: '14px 28px', borderRadius: 12, fontSize: 16, fontWeight: 800, textDecoration: 'none', display: 'inline-block', boxShadow: '0 4px 20px rgba(0,0,0,0.15)' }}>Παίξε demo →</a>
+            <a href="/login" style={{ background: 'rgba(255,255,255,0.14)', color: 'white', padding: '14px 28px', borderRadius: 12, fontSize: 16, fontWeight: 800, textDecoration: 'none', display: 'inline-block', border: '1px solid rgba(255,255,255,0.35)' }}>Φτιάξε λογαριασμό</a>
+          </div>
         </div>
 
         {/* Footer */}
-<div style={{ borderTop: `1px solid ${c.footerBorder}`, padding: '24px 32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-  <div style={{ fontSize: 16, fontWeight: 800, color: c.text }}>Panhel<span className="gradient-text">Quiz</span></div>
-  <div style={{ display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap' }}>
-    <a href="/privacy" style={{ fontSize: 13, color: c.textSub, textDecoration: 'none' }}><a href="/privacy" style={{ fontSize: 13, color: c.textSub, textDecoration: 'none' }}>Πολιτική Απορρήτου</a>
-<a href="/terms" style={{ fontSize: 13, color: c.textSub, textDecoration: 'none' }}>Όροι Χρήσης</a>
-<a href="/privacy" style={{ fontSize: 13, color: c.textSub, textDecoration: 'none' }}>Cookies</a>
-<span style={{ fontSize: 13, color: c.textMuted }}>© 2025 PanhelQuiz</span></a>
-    <a href="/privacy" style={{ fontSize: 13, color: c.textSub, textDecoration: 'none' }}>Cookies</a>
-    <span style={{ fontSize: 13, color: c.textMuted }}>© 2025 PanhelQuiz</span>
-  </div>
-</div>
+        <div style={{ borderTop: `1px solid ${c.footerBorder}`, padding: '24px 32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+          <div style={{ fontSize: 16, fontWeight: 800, color: c.text }}>Panhel<span className="gradient-text">Quiz</span></div>
+          <div style={{ display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap' }}>
+            <a href="/privacy" style={{ fontSize: 13, color: c.textSub, textDecoration: 'none' }}>Πολιτική Απορρήτου</a>
+            <a href="/terms" style={{ fontSize: 13, color: c.textSub, textDecoration: 'none' }}>Όροι Χρήσης</a>
+            <a href="/privacy" style={{ fontSize: 13, color: c.textSub, textDecoration: 'none' }}>Cookies</a>
+            <span style={{ fontSize: 13, color: c.textMuted }}>© 2025 PanhelQuiz</span>
+          </div>
+        </div>
 
       </main>
     </>

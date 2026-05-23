@@ -168,11 +168,11 @@ const pollInterval = setInterval(async () => {
 
       <main style={{ minHeight: '100vh', background: c.bg, fontFamily: 'inherit', transition: 'background 0.3s ease', color: c.text, overflowX: 'hidden' }}> 
 
-        <nav style={{ background: c.navBg, backdropFilter: 'blur(10px)', borderBottom: `1px solid ${c.navBorder}`, padding: '0 24px', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100 }}>
+        <nav style={{ background: c.navBg, backdropFilter: 'blur(10px)', borderBottom: `1px solid ${c.navBorder}`, padding: '0 16px', height: 56 , display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100 }}>
           <div style={{ fontSize: 18, fontWeight: 800, color: c.text }}>Panhel<span style={{ color: '#1D9E75' }}>Quiz</span></div>
           <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
             {[['Dashboard', '/dashboard'], ['Παίξε', '/lobby'], ['Leaderboard', '/leaderboard'], ['Profile', '/profile']].map(([n, href]) => (
-              <a key={n} href={href} style={{ padding: '6px 12px', borderRadius: 8, fontSize: 13, fontWeight: 500, color: n === 'Παίξε' ? '#0F6E56' : c.textSub, background: n === 'Παίξε' ? 'rgba(29,158,117,0.12)' : 'transparent', textDecoration: 'none' }}>{n}</a>
+              <a key={n} href={href} style={{ padding: '6px 8px', borderRadius: 8, fontSize: 12, fontWeight: 500, color: n === 'Παίξε' ? '#0F6E56' : c.textSub, background: n === 'Παίξε' ? 'rgba(29,158,117,0.12)' : 'transparent', textDecoration: 'none' }}>{n}</a>
             ))}
             <button className="toggle-btn" onClick={toggleDark} style={{ marginLeft: 4, padding: '6px 10px', borderRadius: 20, border: `1px solid ${c.cardBorder}`, background: dark ? 'rgba(255,255,255,0.08)' : '#f3f4f6', color: c.text, fontSize: 15, cursor: 'pointer' }}>
               {dark ? '☀️' : '🌙'}
@@ -184,7 +184,7 @@ const pollInterval = setInterval(async () => {
         </nav>
 
         {screen === 'lobby' && (
-          <div style={{ maxWidth: 520, margin: '0 auto', padding: '28px 20px' }}>
+          <div style={{ maxWidth: 520, margin: '0 auto', padding: '28px 16px' }}>
             <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 4, color: c.text }}>Νέα παρτίδα</h1>
             <p style={{ fontSize: 14, color: c.textSub, marginBottom: 24 }}>Διάλεξε τάξη και μάθημα για να βρούμε αντίπαλο.</p>
 
