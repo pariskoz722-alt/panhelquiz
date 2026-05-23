@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import { supabase } from '../lib/supabase';
+import NotificationBell from '../components/NotificationBell';
 
 const SUBJECTS = ['Όλα', 'Μαθηματικά', 'Φυσική', 'Χημεία', 'Βιολογία', 'Ιστορία', 'Έκθεση'];
 const CLASSES = ['Όλες', "Α' Λυκείου", "Β' Λυκείου", "Γ' Λυκείου"];
@@ -183,8 +184,9 @@ export default function LeaderboardPage() {
               border: link.active ? '1px solid rgba(29,158,117,0.3)' : '1px solid transparent',
             }}>{link.label}</a>
           ))}
+          <NotificationBell />
           <button className="toggle-btn leaderboard-theme-toggle" onClick={toggleDark} style={{
-            marginLeft: 8, padding: '6px 12px', borderRadius: 20,
+            marginLeft: 4, padding: '6px 12px', borderRadius: 20,
             border: `1px solid ${c.cardBorder}`,
             background: dark ? 'rgba(255,255,255,0.08)' : '#f3f4f6',
             color: c.text, fontSize: 16, cursor: 'pointer',

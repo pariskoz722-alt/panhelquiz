@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useTheme } from '../context/ThemeContext'
 import { supabase } from '../lib/supabase'
+import NotificationBell from '../components/NotificationBell'
 
 export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState<'stats' | 'history' | 'settings'>('stats')
@@ -131,7 +132,8 @@ export default function ProfilePage() {
           ].map(link => (
             <a key={link.href} href={link.href} style={{ textDecoration: 'none', padding: '6px 14px', borderRadius: 8, fontSize: 14, fontWeight: link.active ? 700 : 500, color: link.active ? '#1D9E75' : c.textSub, background: link.active ? 'rgba(29,158,117,0.12)' : 'transparent', border: link.active ? '1px solid rgba(29,158,117,0.3)' : '1px solid transparent' }}>{link.label}</a>
           ))}
-          <button className="toggle-btn" onClick={toggleDark} style={{ marginLeft: 8, padding: '6px 12px', borderRadius: 20, border: `1px solid ${c.cardBorder}`, background: dark ? 'rgba(255,255,255,0.08)' : '#f3f4f6', color: c.text, fontSize: 16, cursor: 'pointer' }}>{dark ? '☀️' : '🌙'}</button>
+          <NotificationBell />
+          <button className="toggle-btn" onClick={toggleDark} style={{ marginLeft: 4, padding: '6px 12px', borderRadius: 20, border: `1px solid ${c.cardBorder}`, background: dark ? 'rgba(255,255,255,0.08)' : '#f3f4f6', color: c.text, fontSize: 16, cursor: 'pointer' }}>{dark ? '☀️' : '🌙'}</button>
         </div>
       </nav>
 

@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useTheme } from '../context/ThemeContext'
 import { supabase } from '../lib/supabase'
+import NotificationBell from '../components/NotificationBell'
 
 export default function Dashboard() {
   const [menuOpen, setMenuOpen] = useState(false)
@@ -105,7 +106,8 @@ export default function Dashboard() {
             {dark ? '☀️' : '🌙'}
           </button>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <NotificationBell />
           <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#1D9E75', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700 }}>
             {profile?.username?.slice(0, 2).toUpperCase() || 'ΜΠ'}
           </div>

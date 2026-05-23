@@ -2,6 +2,8 @@
 import { useState, useEffect } from 'react'
 import { useTheme } from '../context/ThemeContext'
 import { supabase } from '../lib/supabase'
+import NotificationBell from '../components/NotificationBell'
+import { useToast } from '../components/Toast'
 
 const subjects = [
   { id: 'math', name: 'Μαθηματικά', icon: '∑', color: '#1D9E75', players: 89 },
@@ -23,6 +25,7 @@ export default function Lobby() {
   const [opponent, setOpponent] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
   const { dark, toggleDark } = useTheme()
+  const { addToast } = useToast()
 
   const c = {
     bg: dark ? '#0A0E14' : '#f9fafb',
@@ -87,6 +90,7 @@ export default function Lobby() {
     if (roomData) {
       setOpponent(roomData.player1)
       setScreen('found')
+      addToast({ type: 'info', title: 'Αντίπαλος βρέθηκε!', message: `vs ${roomData.player1?.username}` })
       setTimeout(() => { window.location.href = `/game?room=${room_id}` }, 2000)
     }
   } else {
@@ -105,6 +109,7 @@ const pollInterval = setInterval(async () => {
     clearInterval(pollInterval)
     setOpponent(roomCheck.player2)
     setScreen('found')
+    addToast({ type: 'info', title: 'Αντίπαλος βρέθηκε!', message: `vs ${roomCheck.player2?.username}` })
     setTimeout(() => { window.location.href = `/game?room=${room_id}` }, 2000)
   }
 }, 1000)
@@ -126,6 +131,7 @@ const pollInterval = setInterval(async () => {
             .single()
           setOpponent(opp)
           setScreen('found')
+          addToast({ type: 'info', title: 'Αντίπαλος βρέθηκε!', message: `vs ${opp?.username}` })
           setTimeout(() => { window.location.href = `/game?room=${room_id}` }, 2000)
         }
       })
@@ -178,8 +184,11 @@ const pollInterval = setInterval(async () => {
               {dark ? '☀️' : '🌙'}
             </button>
           </div>
-          <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#1D9E75', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>
-            {profile?.username?.[0]?.toUpperCase() || 'Π'}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <NotificationBell />
+            <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#1D9E75', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>
+              {profile?.username?.[0]?.toUpperCase() || 'Π'}
+            </div>
           </div>
         </nav>
 

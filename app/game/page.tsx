@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useTheme } from '../context/ThemeContext'
 import { supabase } from '../lib/supabase'
+import { useToast } from '../components/Toast'
 
 const questionsBySubject: Record<string, { q: string; answers: string[]; correct: number }[]> = {
   math: [
@@ -85,6 +86,7 @@ export default function Game() {
   const myProfileRef = useRef<any>(null)
 
   const { dark, toggleDark } = useTheme()
+  const { addToast } = useToast()
 
   const c = {
     bg: dark ? '#0A0E14' : '#f9fafb',
@@ -245,10 +247,11 @@ else setChatInput('')
     const eloChange = iWon ? 18 : -14
     const me = myProfileRef.current
     const opp = oppProfile
+    const newElo = me.elo + eloChange
 
     await supabase.from('game_rooms').update({ status: 'finished' }).eq('id', currentRoomRef.current.id)
     await supabase.from('profiles').update({
-      elo: me.elo + eloChange,
+      elo: newElo,
       wins: iWon ? me.wins + 1 : me.wins,
       losses: iWon ? me.losses : me.losses + 1,
     }).eq('id', me.id)
@@ -261,6 +264,36 @@ else setChatInput('')
       score_p2: isPlayer1 ? finalScoreOpp : finalScoreYou,
       elo_change: Math.abs(eloChange),
     })
+
+    // Game result toast + notification
+    const oppName = opp?.username || 'Αντίπαλος'
+    addToast({
+      type: iWon ? 'win' : 'loss',
+      title: iWon ? 'Νίκη! 🏆' : 'Ήττα',
+      message: `vs ${oppName} · ${iWon ? '+' : ''}${eloChange} ELO`,
+      duration: 5500,
+    })
+    await supabase.from('notifications').insert({
+      user_id: me.id,
+      type: 'game_result',
+      title: iWon ? `Νίκη vs ${oppName}` : `Ήττα vs ${oppName}`,
+      message: `${finalScoreYou}–${finalScoreOpp} · ${iWon ? '+' : ''}${eloChange} ELO → ${newElo}`,
+      data: { won: iWon, eloChange, newElo, opponent: oppName },
+    })
+
+    // ELO milestone notification
+    const milestones = [1300, 1400, 1500, 1600, 1700, 1800, 1900, 2000]
+    const crossed = milestones.find(m => me.elo < m && newElo >= m)
+    if (crossed) {
+      addToast({ type: 'success', title: `Milestone: ${crossed} ELO! 🎉`, duration: 6000 })
+      await supabase.from('notifications').insert({
+        user_id: me.id,
+        type: 'rank_milestone',
+        title: `Έφτασες τα ${crossed} ELO!`,
+        message: 'Συγχαρητήρια! Συνέχισε να ανεβαίνεις.',
+        data: { milestone: crossed },
+      })
+    }
   }
 
   function pick(i: number) {
