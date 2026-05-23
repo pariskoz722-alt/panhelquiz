@@ -16,6 +16,7 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   const { dark, toggleDark } = useTheme()
 
   const c = {
@@ -117,9 +118,12 @@ export default function ProfilePage() {
         .input-field { border-radius: 10px; color: inherit; padding: 10px 14px; font-size: 15px; width: 100%; outline: none; box-sizing: border-box; }
         .input-field:focus { border-color: #1D9E75; }
         .toggle-btn { transition: all 0.2s ease; cursor: pointer; }
+        .profile-nav-links { display: flex !important; }
+        .profile-hamburger { display: none !important; }
         @media (max-width: 640px) {
           .profile-stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
           .profile-nav-links { display: none !important; }
+          .profile-hamburger { display: flex !important; }
         }
       `}</style>
 
@@ -128,18 +132,42 @@ export default function ProfilePage() {
           <span style={{ fontSize: 20, fontWeight: 800, color: '#1D9E75' }}>Panhel<span style={{ color: c.text }}>Quiz</span></span>
         </a>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {/* Desktop links */}
+          <div className="profile-nav-links" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {[
+              { label: 'Dashboard', href: '/dashboard' },
+              { label: 'Lobby', href: '/lobby' },
+              { label: 'Leaderboard', href: '/leaderboard' },
+              { label: 'Profile', href: '/profile', active: true },
+            ].map(link => (
+              <a key={link.href} href={link.href} style={{ textDecoration: 'none', padding: '6px 14px', borderRadius: 8, fontSize: 14, fontWeight: link.active ? 700 : 500, color: link.active ? '#1D9E75' : c.textSub, background: link.active ? 'rgba(29,158,117,0.12)' : 'transparent', border: link.active ? '1px solid rgba(29,158,117,0.3)' : '1px solid transparent' }}>{link.label}</a>
+            ))}
+          </div>
+          {/* Always visible */}
+          <NotificationBell />
+          <button className="toggle-btn" onClick={toggleDark} style={{ marginLeft: 4, padding: '6px 12px', borderRadius: 20, border: `1px solid ${c.cardBorder}`, background: dark ? 'rgba(255,255,255,0.08)' : '#f3f4f6', color: c.text, fontSize: 16, cursor: 'pointer' }}>{dark ? '☀️' : '🌙'}</button>
+          {/* Hamburger — mobile only */}
+          <button className="profile-hamburger" onClick={() => setMenuOpen(o => !o)} style={{ display: 'none', flexDirection: 'column', gap: 5, padding: '7px 8px', background: 'none', border: `1px solid ${c.cardBorder}`, borderRadius: 8, cursor: 'pointer' }}>
+            <span style={{ display: 'block', width: 20, height: 2, background: c.text, borderRadius: 2, transition: 'all 0.25s', transform: menuOpen ? 'rotate(45deg) translate(5px, 5px)' : 'none' }} />
+            <span style={{ display: 'block', width: 20, height: 2, background: c.text, borderRadius: 2, transition: 'all 0.25s', opacity: menuOpen ? 0 : 1 }} />
+            <span style={{ display: 'block', width: 20, height: 2, background: c.text, borderRadius: 2, transition: 'all 0.25s', transform: menuOpen ? 'rotate(-45deg) translate(5px, -5px)' : 'none' }} />
+          </button>
+        </div>
+      </nav>
+
+      {/* Mobile dropdown */}
+      {menuOpen && (
+        <div style={{ position: 'fixed', top: 60, left: 0, right: 0, zIndex: 99, background: c.navBg, backdropFilter: 'blur(10px)', borderBottom: `1px solid ${c.navBorder}`, padding: '12px 16px 16px', display: 'flex', flexDirection: 'column', gap: 4, boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }}>
           {[
             { label: 'Dashboard', href: '/dashboard' },
             { label: 'Lobby', href: '/lobby' },
             { label: 'Leaderboard', href: '/leaderboard' },
             { label: 'Profile', href: '/profile', active: true },
           ].map(link => (
-            <a key={link.href} href={link.href} style={{ textDecoration: 'none', padding: '6px 14px', borderRadius: 8, fontSize: 14, fontWeight: link.active ? 700 : 500, color: link.active ? '#1D9E75' : c.textSub, background: link.active ? 'rgba(29,158,117,0.12)' : 'transparent', border: link.active ? '1px solid rgba(29,158,117,0.3)' : '1px solid transparent' }}>{link.label}</a>
+            <a key={link.href} href={link.href} style={{ padding: '12px 16px', borderRadius: 10, fontSize: 15, fontWeight: link.active ? 700 : 500, color: link.active ? '#1D9E75' : c.text, background: link.active ? 'rgba(29,158,117,0.1)' : 'transparent', textDecoration: 'none' }}>{link.label}</a>
           ))}
-          <NotificationBell />
-          <button className="toggle-btn" onClick={toggleDark} style={{ marginLeft: 4, padding: '6px 12px', borderRadius: 20, border: `1px solid ${c.cardBorder}`, background: dark ? 'rgba(255,255,255,0.08)' : '#f3f4f6', color: c.text, fontSize: 16, cursor: 'pointer' }}>{dark ? '☀️' : '🌙'}</button>
         </div>
-      </nav>
+      )}
 
       <div style={{ minHeight: '100vh', background: c.bg, paddingTop: 80, paddingBottom: 60, color: c.text, transition: 'background 0.3s ease' }}>
         <div style={{ maxWidth: 860, margin: '0 auto', padding: '0 20px' }}>

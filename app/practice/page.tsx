@@ -15,6 +15,7 @@ const AI_NAMES: Record<number, string> = { 1: "AI Νέος", 2: "AI Μέσος",
 export default function Practice() {
   const { dark, toggleDark } = useTheme()
   const [profile, setProfile] = useState<any>(null)
+  const [menuOpen, setMenuOpen] = useState(false)
 
   // Config
   const [subject, setSubject] = useState('math')
@@ -149,6 +150,12 @@ export default function Practice() {
         @keyframes bounceIn { from{transform:scale(0)} to{transform:scale(1)} }
         .sel-btn { transition: all 0.2s; cursor: pointer; font-family: inherit; }
         .sel-btn:hover { transform: translateY(-2px); }
+        .practice-nav-links { display: flex !important; }
+        .practice-hamburger { display: none !important; }
+        @media (max-width: 640px) {
+          .practice-nav-links { display: none !important; }
+          .practice-hamburger { display: flex !important; }
+        }
         @media (max-width: 600px) {
           .answers-grid { grid-template-columns: 1fr !important; }
           .subj-grid { grid-template-columns: 1fr 1fr !important; }
@@ -160,23 +167,43 @@ export default function Practice() {
 
         {/* Navbar — only on select */}
         {screen === 'select' && (
-          <nav style={{ background: c.navBg, backdropFilter: 'blur(10px)', borderBottom: `1px solid ${c.navBorder}`, padding: '0 16px', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100 }}>
-            <div style={{ fontSize: 18, fontWeight: 800, color: c.text }}>Panhel<span style={{ color: '#1D9E75' }}>Quiz</span></div>
-            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-              {([['Dashboard', '/dashboard'], ['Παίξε', '/lobby'], ['Εξάσκηση', '/practice'], ['Leaderboard', '/leaderboard']] as [string,string][]).map(([n, href]) => (
-                <a key={n} href={href} style={{ padding: '6px 8px', borderRadius: 8, fontSize: 12, fontWeight: 500, color: n === 'Εξάσκηση' ? '#0F6E56' : c.textSub, background: n === 'Εξάσκηση' ? 'rgba(29,158,117,0.12)' : 'transparent', textDecoration: 'none' }}>{n}</a>
-              ))}
-              <button onClick={toggleDark} style={{ marginLeft: 4, padding: '6px 10px', borderRadius: 20, border: `1px solid ${c.cardBorder}`, background: dark ? 'rgba(255,255,255,0.08)' : '#f3f4f6', color: c.text, fontSize: 15, cursor: 'pointer' }}>
-                {dark ? '☀️' : '🌙'}
-              </button>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <NotificationBell />
-              <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#1D9E75', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>
-                {profile?.username?.[0]?.toUpperCase() || 'Π'}
+          <>
+            <nav style={{ background: c.navBg, backdropFilter: 'blur(10px)', borderBottom: `1px solid ${c.navBorder}`, padding: '0 16px', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100 }}>
+              <div style={{ fontSize: 18, fontWeight: 800, color: c.text }}>Panhel<span style={{ color: '#1D9E75' }}>Quiz</span></div>
+              <div className="practice-nav-links" style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                {([['Dashboard', '/dashboard'], ['Παίξε', '/lobby'], ['Εξάσκηση', '/practice'], ['Leaderboard', '/leaderboard']] as [string,string][]).map(([n, href]) => (
+                  <a key={n} href={href} style={{ padding: '6px 8px', borderRadius: 8, fontSize: 12, fontWeight: 500, color: n === 'Εξάσκηση' ? '#0F6E56' : c.textSub, background: n === 'Εξάσκηση' ? 'rgba(29,158,117,0.12)' : 'transparent', textDecoration: 'none' }}>{n}</a>
+                ))}
+                <button onClick={toggleDark} style={{ marginLeft: 4, padding: '6px 10px', borderRadius: 20, border: `1px solid ${c.cardBorder}`, background: dark ? 'rgba(255,255,255,0.08)' : '#f3f4f6', color: c.text, fontSize: 15, cursor: 'pointer' }}>
+                  {dark ? '☀️' : '🌙'}
+                </button>
               </div>
-            </div>
-          </nav>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                {/* Hamburger — mobile only */}
+                <button className="practice-hamburger" onClick={() => setMenuOpen(o => !o)} style={{ display: 'none', flexDirection: 'column', gap: 5, padding: '7px 8px', background: 'none', border: `1px solid ${c.cardBorder}`, borderRadius: 8, cursor: 'pointer' }}>
+                  <span style={{ display: 'block', width: 20, height: 2, background: c.text, borderRadius: 2, transition: 'all 0.25s', transform: menuOpen ? 'rotate(45deg) translate(5px, 5px)' : 'none' }} />
+                  <span style={{ display: 'block', width: 20, height: 2, background: c.text, borderRadius: 2, transition: 'all 0.25s', opacity: menuOpen ? 0 : 1 }} />
+                  <span style={{ display: 'block', width: 20, height: 2, background: c.text, borderRadius: 2, transition: 'all 0.25s', transform: menuOpen ? 'rotate(-45deg) translate(5px, -5px)' : 'none' }} />
+                </button>
+                <NotificationBell />
+                <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#1D9E75', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>
+                  {profile?.username?.[0]?.toUpperCase() || 'Π'}
+                </div>
+              </div>
+            </nav>
+            {/* Mobile dropdown */}
+            {menuOpen && (
+              <div style={{ position: 'fixed', top: 56, left: 0, right: 0, zIndex: 99, background: c.navBg, backdropFilter: 'blur(10px)', borderBottom: `1px solid ${c.navBorder}`, padding: '12px 16px 16px', display: 'flex', flexDirection: 'column', gap: 4, boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }}>
+                {([['Dashboard', '/dashboard'], ['Παίξε', '/lobby'], ['Εξάσκηση', '/practice'], ['Leaderboard', '/leaderboard']] as [string,string][]).map(([n, href]) => (
+                  <a key={n} href={href} style={{ padding: '12px 16px', borderRadius: 10, fontSize: 15, fontWeight: 600, color: n === 'Εξάσκηση' ? '#1D9E75' : c.text, background: n === 'Εξάσκηση' ? 'rgba(29,158,117,0.1)' : 'transparent', textDecoration: 'none' }}>{n}</a>
+                ))}
+                <div style={{ marginTop: 8, paddingTop: 12, borderTop: `1px solid ${c.cardBorder}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 14, color: c.textSub }}>Εμφάνιση</span>
+                  <button onClick={toggleDark} style={{ padding: '6px 14px', borderRadius: 20, border: `1px solid ${c.cardBorder}`, background: dark ? 'rgba(255,255,255,0.08)' : '#f3f4f6', color: c.text, fontSize: 15, cursor: 'pointer' }}>{dark ? '☀️' : '🌙'}</button>
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {/* ── SELECT ── */}

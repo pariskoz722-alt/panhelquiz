@@ -8,6 +8,14 @@ import NotificationBell from '../components/NotificationBell';
 const SUBJECTS = ['Όλα', 'Μαθηματικά', 'Φυσική', 'Χημεία', 'Βιολογία', 'Ιστορία', 'Έκθεση'];
 const CLASSES = ['Όλες', "Α' Λυκείου", "Β' Λυκείου", "Γ' Λυκείου"];
 
+const SUBJECT_MAP: Record<string, string | null> = {
+  'Όλα': null, 'Μαθηματικά': 'math', 'Φυσική': 'physics',
+  'Χημεία': 'chemistry', 'Βιολογία': 'biology', 'Ιστορία': 'history', 'Έκθεση': 'lit',
+};
+const GRADE_MAP: Record<string, number | null> = {
+  'Όλες': null, "Α' Λυκείου": 1, "Β' Λυκείου": 2, "Γ' Λυκείου": 3,
+};
+
 export default function LeaderboardPage() {
   const [selectedSubject, setSelectedSubject] = useState('Όλα');
   const [selectedClass, setSelectedClass] = useState('Όλες');
@@ -35,30 +43,59 @@ export default function LeaderboardPage() {
 
   useEffect(() => {
     setTimeout(() => setVisible(true), 50);
-    loadData();
   }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [selectedSubject, selectedClass]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function loadData() {
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
 
-    const { data: allPlayers } = await supabase
-      .from('profiles')
-      .select('id, username, elo, wins, losses, grade')
-      .order('elo', { ascending: false })
-      .limit(20);
+    const subjectId = SUBJECT_MAP[selectedSubject];
+    const gradeNum  = GRADE_MAP[selectedClass];
 
-    if (allPlayers) {
-      setPlayers(allPlayers);
-      if (user) {
-        const rank = allPlayers.findIndex(p => p.id === user.id) + 1;
-        setMyRank(rank > 0 ? rank : null);
-        const me = allPlayers.find(p => p.id === user.id);
-        setMyProfile(me);
-        if (!me) {
-          const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-          setMyProfile(profile);
-        }
+    let allPlayers: any[] = [];
+
+    if (subjectId !== null) {
+      // --- Subject filter: rank by wins in that subject ---
+      const { data: games } = await supabase
+        .from('games')
+        .select('winner_id')
+        .eq('subject', subjectId);
+
+      const winCounts: Record<string, number> = {};
+      for (const g of games || []) {
+        if (g.winner_id) winCounts[g.winner_id] = (winCounts[g.winner_id] || 0) + 1;
+      }
+
+      let q = supabase.from('profiles').select('id, username, elo, wins, losses, grade');
+      if (gradeNum !== null) q = (q as any).eq('grade', gradeNum);
+      const { data: profiles } = await (q as any).limit(200);
+
+      allPlayers = (profiles || [])
+        .map((p: any) => ({ ...p, subjectWins: winCounts[p.id] || 0 }))
+        .filter((p: any) => p.subjectWins > 0)
+        .sort((a: any, b: any) => b.subjectWins - a.subjectWins)
+        .slice(0, 20);
+    } else {
+      // --- No subject filter: rank by ELO ---
+      let q = supabase.from('profiles').select('id, username, elo, wins, losses, grade').order('elo', { ascending: false });
+      if (gradeNum !== null) q = (q as any).eq('grade', gradeNum);
+      const { data } = await (q as any).limit(20);
+      allPlayers = (data || []).map((p: any) => ({ ...p, subjectWins: undefined }));
+    }
+
+    setPlayers(allPlayers);
+    if (user) {
+      const rank = allPlayers.findIndex((p: any) => p.id === user.id) + 1;
+      setMyRank(rank > 0 ? rank : null);
+      const me = allPlayers.find((p: any) => p.id === user.id);
+      setMyProfile(me);
+      if (!me) {
+        const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+        setMyProfile(profile);
       }
     }
     setLoading(false);
@@ -66,6 +103,7 @@ export default function LeaderboardPage() {
 
   const top3 = players.slice(0, 3);
   const rest = players.slice(3);
+  const isSubjectFiltered = SUBJECT_MAP[selectedSubject] !== null;
 
   const winRate = (p: any) => Math.round((p.wins / Math.max(p.wins + p.losses, 1)) * 100);
 
@@ -239,8 +277,8 @@ export default function LeaderboardPage() {
             <div style={{ textAlign: 'center', padding: '60px 0', color: c.textSub }}>Φόρτωση...</div>
           ) : (
             <>
-              {/* Podium */}
-              {top3.length === 3 && (
+              {/* Podium — only for overall ELO ranking */}
+              {top3.length === 3 && !isSubjectFiltered && (
                 <div className="leaderboard-podium" style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 16, flexWrap: 'wrap', marginBottom: 40, opacity: visible ? 1 : 0, transition: 'all 0.6s ease 0.25s' }}>
                   <PodiumCard player={top3[1]} rank={2} podiumHeight={110} delay={0.35} dark={dark} c={c} />
                   <PodiumCard player={top3[0]} rank={1} podiumHeight={150} delay={0.2} isFirst dark={dark} c={c} />
@@ -248,23 +286,30 @@ export default function LeaderboardPage() {
                 </div>
               )}
 
+              {/* Subject filter banner */}
+              {isSubjectFiltered && players.length === 0 && (
+                <div style={{ textAlign: 'center', padding: '40px 0', color: c.textSub }}>
+                  Δεν υπάρχουν παίκτες με νίκες σε αυτό το μάθημα ακόμα. Γίνε ο πρώτος!
+                </div>
+              )}
+
               {/* Table */}
-              {rest.length > 0 && (
+              {(isSubjectFiltered ? players : rest).length > 0 && (
                 <div className="leaderboard-table-card" style={{ background: c.card, border: `1px solid ${c.cardBorder}`, borderRadius: 16, overflow: 'hidden', boxShadow: dark ? 'none' : '0 1px 4px rgba(0,0,0,0.06)', marginBottom: 20 }}>
                   <div className="leaderboard-table-header" style={{ display: 'grid', gridTemplateColumns: '60px 1fr 120px 100px 80px', padding: '14px 20px', borderBottom: `1px solid ${c.cardBorder}`, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: c.textMuted }}>
                     <span>#</span><span>Παίκτης</span>
                     <span style={{ textAlign: 'center' }}>ELO</span>
-                    <span style={{ textAlign: 'center' }}>Win Rate</span>
-                    <span style={{ textAlign: 'center' }}>Νίκες</span>
+                    <span style={{ textAlign: 'center' }}>{isSubjectFiltered ? 'Win Rate' : 'Win Rate'}</span>
+                    <span style={{ textAlign: 'center' }}>{isSubjectFiltered ? 'Νίκες μαθ.' : 'Νίκες'}</span>
                   </div>
-                  {rest.map((player, i) => (
+                  {(isSubjectFiltered ? players : rest).map((player, i) => (
                     <div key={player.id} className="row-hover leaderboard-table-row" style={{
                       display: 'grid', gridTemplateColumns: '60px 1fr 120px 100px 80px',
                       padding: '16px 20px',
-                      borderBottom: i < rest.length - 1 ? `1px solid ${c.rowBorder}` : 'none',
+                      borderBottom: i < (isSubjectFiltered ? players : rest).length - 1 ? `1px solid ${c.rowBorder}` : 'none',
                       alignItems: 'center', background: 'transparent',
                     }}>
-                      <span style={{ fontSize: 18, fontWeight: 800, color: c.textMuted }}>{i + 4}</span>
+                      <span style={{ fontSize: 18, fontWeight: 800, color: c.textMuted }}>{isSubjectFiltered ? i + 1 : i + 4}</span>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'linear-gradient(135deg, #1D9E75, #0D6B4F)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 800, color: '#fff', flexShrink: 0 }}>
                           {player.username?.[0]?.toUpperCase() || '?'}
@@ -276,7 +321,9 @@ export default function LeaderboardPage() {
                       </div>
                       <div style={{ textAlign: 'center', fontSize: 16, fontWeight: 800, color: '#1D9E75' }}>{player.elo}</div>
                       <div style={{ textAlign: 'center', fontSize: 13, fontWeight: 700, color: winRate(player) >= 50 ? '#1D9E75' : '#ef4444' }}>{winRate(player)}%</div>
-                      <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 700, color: c.textSub }}>{player.wins}W</div>
+                      <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 700, color: c.textSub }}>
+                        {isSubjectFiltered ? `${player.subjectWins}W` : `${player.wins}W`}
+                      </div>
                     </div>
                   ))}
                 </div>

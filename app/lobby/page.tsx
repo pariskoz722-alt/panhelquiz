@@ -25,6 +25,7 @@ export default function Lobby() {
   const [opponent, setOpponent] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
   const [playerCounts, setPlayerCounts] = useState<Record<string, number>>({})
+  const [menuOpen, setMenuOpen] = useState(false)
   const { dark, toggleDark } = useTheme()
   const { addToast } = useToast()
   // Refs so cancelMatch() can stop an in-progress search
@@ -220,6 +221,12 @@ export default function Lobby() {
         .opp-avatar-appear { animation: popIn 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards; }
         @keyframes popIn { from{transform:scale(0);opacity:0} to{transform:scale(1);opacity:1} }
         .toggle-btn { transition: all 0.2s; cursor: pointer; }
+        .lobby-nav-links { display: flex !important; }
+        .lobby-hamburger { display: none !important; }
+        @media (max-width: 640px) {
+          .lobby-nav-links { display: none !important; }
+          .lobby-hamburger { display: flex !important; }
+        }
         @media (max-width: 600px) {
           .subject-grid { grid-template-columns: 1fr !important; }
           .mode-row { flex-direction: column !important; }
@@ -230,7 +237,7 @@ export default function Lobby() {
 
         <nav style={{ background: c.navBg, backdropFilter: 'blur(10px)', borderBottom: `1px solid ${c.navBorder}`, padding: '0 16px', height: 56 , display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100 }}>
           <div style={{ fontSize: 18, fontWeight: 800, color: c.text }}>Panhel<span style={{ color: '#1D9E75' }}>Quiz</span></div>
-          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          <div className="lobby-nav-links" style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
             {[['Dashboard', '/dashboard'], ['Παίξε', '/lobby'], ['Leaderboard', '/leaderboard'], ['Profile', '/profile']].map(([n, href]) => (
               <a key={n} href={href} style={{ padding: '6px 8px', borderRadius: 8, fontSize: 12, fontWeight: 500, color: n === 'Παίξε' ? '#0F6E56' : c.textSub, background: n === 'Παίξε' ? 'rgba(29,158,117,0.12)' : 'transparent', textDecoration: 'none' }}>{n}</a>
             ))}
@@ -239,12 +246,31 @@ export default function Lobby() {
             </button>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            {/* Hamburger — mobile only */}
+            <button className="lobby-hamburger" onClick={() => setMenuOpen(o => !o)} style={{ display: 'none', flexDirection: 'column', gap: 5, padding: '7px 8px', background: 'none', border: `1px solid ${c.cardBorder}`, borderRadius: 8, cursor: 'pointer' }}>
+              <span style={{ display: 'block', width: 20, height: 2, background: c.text, borderRadius: 2, transition: 'all 0.25s', transform: menuOpen ? 'rotate(45deg) translate(5px, 5px)' : 'none' }} />
+              <span style={{ display: 'block', width: 20, height: 2, background: c.text, borderRadius: 2, transition: 'all 0.25s', opacity: menuOpen ? 0 : 1 }} />
+              <span style={{ display: 'block', width: 20, height: 2, background: c.text, borderRadius: 2, transition: 'all 0.25s', transform: menuOpen ? 'rotate(-45deg) translate(5px, -5px)' : 'none' }} />
+            </button>
             <NotificationBell />
             <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#1D9E75', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>
               {profile?.username?.[0]?.toUpperCase() || 'Π'}
             </div>
           </div>
         </nav>
+
+        {/* Mobile dropdown */}
+        {menuOpen && (
+          <div style={{ position: 'fixed', top: 56, left: 0, right: 0, zIndex: 99, background: c.navBg, backdropFilter: 'blur(10px)', borderBottom: `1px solid ${c.navBorder}`, padding: '12px 16px 16px', display: 'flex', flexDirection: 'column', gap: 4, boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }}>
+            {[['Dashboard', '/dashboard'], ['Παίξε', '/lobby'], ['Leaderboard', '/leaderboard'], ['Profile', '/profile']].map(([n, href]) => (
+              <a key={n} href={href} style={{ padding: '12px 16px', borderRadius: 10, fontSize: 15, fontWeight: 600, color: n === 'Παίξε' ? '#1D9E75' : c.text, background: n === 'Παίξε' ? 'rgba(29,158,117,0.1)' : 'transparent', textDecoration: 'none' }}>{n}</a>
+            ))}
+            <div style={{ marginTop: 8, paddingTop: 12, borderTop: `1px solid ${c.cardBorder}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 14, color: c.textSub }}>Εμφάνιση</span>
+              <button onClick={toggleDark} style={{ padding: '6px 14px', borderRadius: 20, border: `1px solid ${c.cardBorder}`, background: dark ? 'rgba(255,255,255,0.08)' : '#f3f4f6', color: c.text, fontSize: 15, cursor: 'pointer' }}>{dark ? '☀️' : '🌙'}</button>
+            </div>
+          </div>
+        )}
 
         {screen === 'lobby' && (
           <div style={{ maxWidth: 520, margin: '0 auto', padding: '28px 16px' }}>
