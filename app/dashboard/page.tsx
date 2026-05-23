@@ -241,55 +241,94 @@ export default function Dashboard() {
 
           {/* ELO History Chart */}
           {eloHistory.length > 1 && (() => {
-            const W = 400, H = 80, PAD = 4
+            const W = 500, H = 110, PX = 6, PY = 14
             const minE = Math.min(...eloHistory)
             const maxE = Math.max(...eloHistory)
-            const range = maxE - minE || 1
+            const pad = (maxE - minE) * 0.12 || 10
+            const lo = minE - pad, hi = maxE + pad
+            const span = hi - lo
             const n = eloHistory.length
-            const pts = eloHistory.map((e, i) => ({
-              x: PAD + (i / Math.max(n - 1, 1)) * (W - PAD * 2),
-              y: H - PAD - ((e - minE) / range) * (H - PAD * 2),
-            }))
-            const polyline = pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
-            const fillPoly = `${pts[0].x.toFixed(1)},${H} ${polyline} ${pts[pts.length-1].x.toFixed(1)},${H}`
+            const toX = (i: number) => PX + (i / Math.max(n - 1, 1)) * (W - PX * 2)
+            const toY = (e: number) => H - PY - ((e - lo) / span) * (H - PY * 2)
+            const pts = eloHistory.map((e, i) => ({ x: toX(i), y: toY(e) }))
+            // Smooth catmull-rom bezier path
+            const makePath = () => {
+              if (pts.length < 2) return ''
+              let d = `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`
+              for (let i = 0; i < pts.length - 1; i++) {
+                const p0 = pts[Math.max(i - 1, 0)]
+                const p1 = pts[i]
+                const p2 = pts[i + 1]
+                const p3 = pts[Math.min(i + 2, pts.length - 1)]
+                const cp1x = p1.x + (p2.x - p0.x) / 5
+                const cp1y = p1.y + (p2.y - p0.y) / 5
+                const cp2x = p2.x - (p3.x - p1.x) / 5
+                const cp2y = p2.y - (p3.y - p1.y) / 5
+                d += ` C ${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`
+              }
+              return d
+            }
+            const linePath = makePath()
             const last = pts[pts.length - 1]
-            const first = pts[0]
             const trend = eloHistory[eloHistory.length - 1] - eloHistory[0]
+            const trendUp = trend >= 0
+            const fillPath = `${linePath} L ${last.x.toFixed(1)},${H} L ${pts[0].x.toFixed(1)},${H} Z`
             return (
-              <div style={{ background: c.card, border: `1px solid ${c.cardBorder}`, borderRadius: 12, padding: 16, marginBottom: 16 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: c.text }}>📈 Ιστορικό ELO</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: trend >= 0 ? '#1D9E75' : '#ef4444' }}>
-                      {trend >= 0 ? '▲' : '▼'} {Math.abs(trend)} ELO
-                    </span>
-                    <span style={{ fontSize: 11, color: c.textMuted }}>τελευταίες {n - 1} παρτίδες</span>
+              <div style={{ background: c.card, border: `1px solid ${c.cardBorder}`, borderRadius: 16, padding: '18px 20px', marginBottom: 16 }}>
+                <style>{`
+                  @keyframes eloPulse { 0%,100%{r:6;opacity:.6} 50%{r:10;opacity:.15} }
+                  .elo-pulse { animation: eloPulse 2s ease-in-out infinite; transform-origin: center; }
+                `}</style>
+                {/* Header */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: c.text }}>Ιστορικό ELO</div>
+                    <div style={{ fontSize: 11, color: c.textMuted, marginTop: 2 }}>τελευταίες {n - 1} παρτίδες</div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 26, fontWeight: 900, color: '#1D9E75', lineHeight: 1 }}>{eloHistory[eloHistory.length - 1]}</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: trendUp ? '#1D9E75' : '#ef4444', marginTop: 3 }}>
+                      {trendUp ? '▲ +' : '▼ '}{trend} ELO
+                    </div>
                   </div>
                 </div>
-                <div style={{ position: 'relative' }}>
-                  <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="80" preserveAspectRatio="none" style={{ display: 'block', overflow: 'visible' }}>
-                    <defs>
-                      <linearGradient id="eloFill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#1D9E75" stopOpacity="0.3" />
-                        <stop offset="100%" stopColor="#1D9E75" stopOpacity="0.02" />
-                      </linearGradient>
-                    </defs>
-                    {/* Horizontal midline guide */}
-                    <line x1={PAD} y1={H / 2} x2={W - PAD} y2={H / 2} stroke={dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'} strokeWidth="1" strokeDasharray="4 4" />
-                    {/* Fill area */}
-                    <polygon points={fillPoly} fill="url(#eloFill)" />
-                    {/* Line */}
-                    <polyline points={polyline} fill="none" stroke="#1D9E75" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
-                    {/* Start dot */}
-                    <circle cx={first.x} cy={first.y} r="3.5" fill={dark ? '#0A0E14' : 'white'} stroke="#1D9E75" strokeWidth="2" />
-                    {/* End dot (current) */}
-                    <circle cx={last.x} cy={last.y} r="5" fill="#1D9E75" stroke={dark ? '#0A0E14' : 'white'} strokeWidth="2.5" />
-                  </svg>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
-                    <span style={{ fontSize: 11, color: c.textMuted }}>min {minE}</span>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: '#1D9E75' }}>τώρα {eloHistory[eloHistory.length - 1]}</span>
-                    <span style={{ fontSize: 11, color: c.textMuted }}>max {maxE}</span>
-                  </div>
+                {/* SVG chart */}
+                <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="120" preserveAspectRatio="none" style={{ display: 'block', overflow: 'visible' }}>
+                  <defs>
+                    <linearGradient id="eloAreaGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#1D9E75" stopOpacity="0.28" />
+                      <stop offset="75%" stopColor="#1D9E75" stopOpacity="0.04" />
+                      <stop offset="100%" stopColor="#1D9E75" stopOpacity="0" />
+                    </linearGradient>
+                    <linearGradient id="eloLineGrad" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor="#0F6E56" />
+                      <stop offset="100%" stopColor="#22C691" />
+                    </linearGradient>
+                    <filter id="eloGlow" x="-20%" y="-80%" width="140%" height="260%">
+                      <feGaussianBlur stdDeviation="3" result="blur" />
+                      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                    </filter>
+                  </defs>
+                  {/* Subtle grid lines */}
+                  {[0.25, 0.5, 0.75].map((f, i) => (
+                    <line key={i} x1={PX} y1={PY + f * (H - PY * 2)} x2={W - PX} y2={PY + f * (H - PY * 2)}
+                      stroke={dark ? 'rgba(255,255,255,0.045)' : 'rgba(0,0,0,0.045)'} strokeWidth="1" />
+                  ))}
+                  {/* Area fill */}
+                  <path d={fillPath} fill="url(#eloAreaGrad)" />
+                  {/* Glow line (blurred duplicate) */}
+                  <path d={linePath} fill="none" stroke="#1D9E75" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" opacity="0.18" />
+                  {/* Main gradient line */}
+                  <path d={linePath} fill="none" stroke="url(#eloLineGrad)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" filter="url(#eloGlow)" />
+                  {/* Pulse ring */}
+                  <circle className="elo-pulse" cx={last.x} cy={last.y} r="6" fill="#1D9E75" opacity="0.4" />
+                  {/* End dot */}
+                  <circle cx={last.x} cy={last.y} r="4.5" fill="#1D9E75" stroke={dark ? '#151C24' : 'white'} strokeWidth="2.5" />
+                </svg>
+                {/* Min / max labels */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, padding: '0 2px' }}>
+                  <span style={{ fontSize: 11, color: c.textMuted }}>min {minE}</span>
+                  <span style={{ fontSize: 11, color: c.textMuted }}>max {maxE}</span>
                 </div>
               </div>
             )
