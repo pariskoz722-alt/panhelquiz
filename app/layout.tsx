@@ -46,6 +46,9 @@ export const metadata: Metadata = {
     description: "Διάβασε για τις Πανελλήνιες παίζοντας 1v1 quiz battles με άλλους μαθητές.",
     images: ["/og-image.png"],
   },
+  verification: {
+    google: 'q9ElaB6qtL8MUliH9dnlBISBLaYqgdjWlhHiWtOk6g8',
+  },
   robots: {
     index: true,
     follow: true,
