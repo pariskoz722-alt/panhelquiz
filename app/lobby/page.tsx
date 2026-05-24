@@ -18,7 +18,7 @@ export default function Lobby() {
   const [grade, setGrade] = useState(2)
   const [subject, setSubject] = useState('math')
   const [mode, setMode] = useState('ranked')
-  const [screen, setScreen] = useState<'lobby' | 'matching' | 'found'>('lobby')
+  const [screen, setScreen] = useState<'lobby' | 'matching' | 'found' | 'invite_waiting' | 'invite_accept'>('lobby')
   const [dots, setDots] = useState('')
   const [searchTime, setSearchTime] = useState(0)
   const [roomId, setRoomId] = useState<string | null>(null)
@@ -26,6 +26,9 @@ export default function Lobby() {
   const [profile, setProfile] = useState<any>(null)
   const [playerCounts, setPlayerCounts] = useState<Record<string, number>>({})
   const [menuOpen, setMenuOpen] = useState(false)
+  const [inviteLink, setInviteLink] = useState('')
+  const [inviteRoom, setInviteRoom] = useState<any>(null)
+  const [copied, setCopied] = useState(false)
   const { dark, toggleDark } = useTheme()
   const { addToast } = useToast()
   // Refs so cancelMatch() can stop an in-progress search
@@ -71,6 +74,84 @@ export default function Lobby() {
     if (data?.grade) setGrade(data.grade)
     await supabase.rpc('cleanup_old_rooms')
     fetchPlayerCounts()
+
+    // Handle incoming friend invite link
+    const inviteId = new URLSearchParams(window.location.search).get('invite')
+    if (inviteId) loadInviteRoom(inviteId, data)
+  }
+
+  async function loadInviteRoom(inviteId: string, myProfile: any) {
+    const { data: roomData } = await supabase
+      .from('game_rooms')
+      .select('*, player1:profiles!game_rooms_player1_id_fkey(id, username, elo, wins, losses)')
+      .eq('id', inviteId).single()
+
+    if (!roomData || roomData.player1_id === myProfile?.id) {
+      window.history.replaceState({}, '', '/lobby'); return
+    }
+    if (roomData.status !== 'waiting') {
+      addToast({ type: 'error', title: 'Η πρόσκληση έληξε', message: 'Δεν είναι πλέον διαθέσιμη.' })
+      window.history.replaceState({}, '', '/lobby'); return
+    }
+    setInviteRoom(roomData)
+    setRoomId(inviteId)
+    setScreen('invite_accept')
+  }
+
+  async function createFriendRoom() {
+    if (!profile) return
+    const { data: room } = await supabase
+      .from('game_rooms')
+      .insert({ player1_id: profile.id, subject, mode, status: 'waiting' })
+      .select().single()
+    if (!room) return
+
+    const link = `${window.location.origin}/lobby?invite=${room.id}`
+    setInviteLink(link)
+    setRoomId(room.id)
+    setScreen('invite_waiting')
+
+    // Share immediately
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'PanhelQuiz', text: `Παίξε μαζί μου στο PanhelQuiz! ${link}` })
+      } else {
+        await navigator.clipboard.writeText(link)
+        setCopied(true); setTimeout(() => setCopied(false), 2500)
+      }
+    } catch {}
+
+    // Watch for friend to join
+    matchChannelRef.current = supabase
+      .channel(`invite-${room.id}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'game_rooms', filter: `id=eq.${room.id}` }, async (payload) => {
+        if (matchCancelledRef.current) return
+        if (payload.new.status === 'ready' && payload.new.player2_id) {
+          const { data: opp } = await supabase.from('profiles').select('id, username, elo').eq('id', payload.new.player2_id).single()
+          if (matchCancelledRef.current) return
+          setOpponent(opp)
+          setScreen('found')
+          addToast({ type: 'info', title: 'Φίλος εντοπίστηκε!', message: `vs ${opp?.username}` })
+          setTimeout(() => { if (!matchCancelledRef.current) window.location.href = `/game?room=${room.id}` }, 2000)
+        }
+      })
+      .subscribe()
+  }
+
+  async function acceptInvite() {
+    if (!profile || !inviteRoom) return
+    await supabase.from('game_rooms').update({ player2_id: profile.id, status: 'ready' }).eq('id', inviteRoom.id)
+    setOpponent(inviteRoom.player1)
+    setScreen('found')
+    addToast({ type: 'info', title: 'Αποδοχή!', message: `vs ${inviteRoom.player1?.username}` })
+    setTimeout(() => { window.location.href = `/game?room=${inviteRoom.id}` }, 2000)
+  }
+
+  async function cancelInvite() {
+    matchCancelledRef.current = true
+    if (matchChannelRef.current) { supabase.removeChannel(matchChannelRef.current); matchChannelRef.current = null }
+    if (roomId) { await supabase.from('game_rooms').delete().eq('id', roomId); setRoomId(null) }
+    setInviteLink(''); setScreen('lobby')
   }
 
   async function fetchPlayerCounts() {
@@ -321,6 +402,9 @@ export default function Lobby() {
             </div>
 
             <button className="play-btn" onClick={findMatch}>▶ Εύρεση αντιπάλου</button>
+            <button onClick={createFriendRoom} style={{ width: '100%', marginTop: 10, padding: '14px', background: 'transparent', color: '#1D9E75', border: '2px solid #1D9E75', borderRadius: 14, fontFamily: 'inherit', fontSize: 15, fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s' }}>
+              👥 Παίξε με φίλο — Μοιράσου link
+            </button>
           </div>
         )}
 
@@ -358,6 +442,79 @@ export default function Lobby() {
             </div>
 
             <button onClick={cancelMatch} style={{ background: 'transparent', border: `1px solid ${c.btnBorder}`, borderRadius: 10, padding: '10px 24px', fontSize: 14, color: c.textSub, cursor: 'pointer', fontFamily: 'inherit' }}>Ακύρωση</button>
+          </div>
+        )}
+
+        {/* INVITE WAITING — inviter waiting for friend to open the link */}
+        {screen === 'invite_waiting' && (
+          <div style={{ maxWidth: 420, margin: '0 auto', padding: '48px 20px', textAlign: 'center' }}>
+            <div style={{ fontSize: 40, marginBottom: 16 }}>🔗</div>
+            <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 8, color: c.text }}>Αναμονή φίλου...</h2>
+            <p style={{ fontSize: 14, color: c.textSub, marginBottom: 28 }}>Μοιράσου το link παρακάτω. Μόλις ο φίλος σου το ανοίξει, ξεκινάμε!</p>
+
+            {/* Link box */}
+            <div style={{ background: c.card, border: `1px solid ${c.cardBorder}`, borderRadius: 14, padding: '14px 16px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ flex: 1, fontSize: 12, color: c.textSub, wordBreak: 'break-all', textAlign: 'left', userSelect: 'all' }}>{inviteLink}</div>
+              <button onClick={async () => { try { await navigator.clipboard.writeText(inviteLink); setCopied(true); setTimeout(() => setCopied(false), 2500) } catch {} }} style={{ flexShrink: 0, padding: '8px 14px', borderRadius: 8, background: copied ? 'rgba(29,158,117,0.15)' : c.tagBg, border: `1px solid ${copied ? '#1D9E75' : c.btnBorder}`, color: copied ? '#1D9E75' : c.text, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
+                {copied ? '✓ Αντιγράφηκε' : '📋 Αντιγραφή'}
+              </button>
+            </div>
+
+            <button onClick={async () => { try { await navigator.share({ title: 'PanhelQuiz', text: `Παίξε μαζί μου! ${inviteLink}` }) } catch {} }} style={{ width: '100%', padding: '12px', background: 'linear-gradient(135deg, #1D9E75, #0F6E56)', color: 'white', border: 'none', borderRadius: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', marginBottom: 24 }}>
+              📤 Μοιράσου το link
+            </button>
+
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 24 }}>
+              <div className="searching-dot" /><div className="searching-dot" /><div className="searching-dot" />
+            </div>
+            <div style={{ fontSize: 13, color: c.textMuted, marginBottom: 12 }}>
+              {BASE_SUBJECTS.find(s => s.id === subject)?.icon} {BASE_SUBJECTS.find(s => s.id === subject)?.name} · {mode === 'ranked' ? 'Ranked' : 'Casual'}
+            </div>
+            <button onClick={cancelInvite} style={{ background: 'transparent', border: `1px solid ${c.btnBorder}`, borderRadius: 10, padding: '10px 24px', fontSize: 14, color: c.textSub, cursor: 'pointer', fontFamily: 'inherit' }}>Ακύρωση</button>
+          </div>
+        )}
+
+        {/* INVITE ACCEPT — friend opens the link */}
+        {screen === 'invite_accept' && inviteRoom && (
+          <div style={{ maxWidth: 420, margin: '0 auto', padding: '48px 20px', textAlign: 'center' }}>
+            <div style={{ fontSize: 40, marginBottom: 16 }}>⚔️</div>
+            <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 6, color: c.text }}>Πρόσκληση παρτίδας!</h2>
+            <p style={{ fontSize: 14, color: c.textSub, marginBottom: 32 }}>Ο {inviteRoom.player1?.username} σε προκαλεί σε παρτίδα</p>
+
+            {/* Challenger info */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 20, marginBottom: 28 }}>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ width: 72, height: 72, borderRadius: '50%', background: '#1D9E75', color: 'white', fontSize: 24, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 8px', boxShadow: '0 0 20px rgba(29,158,117,0.35)' }}>
+                  {inviteRoom.player1?.username?.[0]?.toUpperCase() || '?'}
+                </div>
+                <div style={{ fontSize: 15, fontWeight: 800, color: c.text }}>{inviteRoom.player1?.username}</div>
+                <div style={{ fontSize: 12, color: c.textSub }}>ELO {inviteRoom.player1?.elo}</div>
+              </div>
+              <div style={{ fontSize: 22, fontWeight: 900, color: c.textMuted }}>VS</div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ width: 72, height: 72, borderRadius: '50%', background: '#E6F1FB', color: '#185FA5', fontSize: 24, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 8px', border: '3px solid #378ADD' }}>
+                  {profile?.username?.[0]?.toUpperCase() || '?'}
+                </div>
+                <div style={{ fontSize: 15, fontWeight: 800, color: c.text }}>{profile?.username}</div>
+                <div style={{ fontSize: 12, color: c.textSub }}>ELO {profile?.elo}</div>
+              </div>
+            </div>
+
+            {/* Game info */}
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginBottom: 28, flexWrap: 'wrap' }}>
+              {[
+                `${BASE_SUBJECTS.find(s => s.id === inviteRoom.subject)?.icon} ${BASE_SUBJECTS.find(s => s.id === inviteRoom.subject)?.name || inviteRoom.subject}`,
+                inviteRoom.mode === 'ranked' ? '⚔️ Ranked' : '🎮 Casual',
+                '5 ερωτήσεις',
+              ].map(t => (
+                <div key={t} style={{ background: c.card, border: `1px solid ${c.cardBorder}`, borderRadius: 20, padding: '5px 14px', fontSize: 13, fontWeight: 600, color: c.textSub }}>{t}</div>
+              ))}
+            </div>
+
+            <button onClick={acceptInvite} style={{ width: '100%', padding: '15px', background: 'linear-gradient(135deg, #1D9E75, #0F6E56)', color: 'white', border: 'none', borderRadius: 14, fontFamily: 'inherit', fontSize: 16, fontWeight: 800, cursor: 'pointer', boxShadow: '0 6px 20px rgba(29,158,117,0.35)', marginBottom: 12 }}>
+              ⚔️ Αποδοχή πρόσκλησης
+            </button>
+            <a href="/lobby" style={{ display: 'block', padding: '12px', background: 'transparent', color: c.textSub, border: `1px solid ${c.btnBorder}`, borderRadius: 12, fontSize: 14, textDecoration: 'none', fontWeight: 600 }}>Αρνήθηκε</a>
           </div>
         )}
 
