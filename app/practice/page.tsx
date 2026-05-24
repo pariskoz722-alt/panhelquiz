@@ -4,6 +4,7 @@ import { useTheme } from '../context/ThemeContext'
 import { supabase } from '../lib/supabase'
 import { pickQuestions, subjectMeta, type Question } from '../lib/questions'
 import { explanations } from '../lib/explanations'
+import { soundCorrect, soundWrong, soundCountdown, soundGo, soundComplete, soundsEnabled, setSoundsEnabled } from '../lib/sounds'
 import NotificationBell from '../components/NotificationBell'
 
 const QUESTION_COUNT = 10
@@ -17,6 +18,8 @@ export default function Practice() {
   const { dark, toggleDark } = useTheme()
   const [profile, setProfile] = useState<any>(null)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [soundOn, setSoundOn] = useState(true)
+  useEffect(() => { setSoundOn(soundsEnabled()) }, [])
 
   // Config
   const [subject, setSubject] = useState('math')
@@ -72,7 +75,8 @@ export default function Practice() {
 
   useEffect(() => {
     if (screen !== 'countdown') return
-    if (countdown === 0) { const t = setTimeout(() => setScreen('game'), 400); return () => clearTimeout(t) }
+    if (countdown === 0) { soundGo(); const t = setTimeout(() => setScreen('game'), 400); return () => clearTimeout(t) }
+    soundCountdown()
     const t = setTimeout(() => setCountdown(c => c - 1), 900)
     return () => clearTimeout(t)
   }, [countdown, screen])
@@ -104,6 +108,7 @@ export default function Practice() {
 
     setSelected(index)
     setFeedback(index === -1 ? 'timeout' : isCorrect ? 'correct' : 'wrong')
+    if (index === -1 || !isCorrect) soundWrong(); else soundCorrect()
 
     if (isCorrect) { setScore(s => s + 100 + bonus); setCorrectCount(c => c + 1) }
     else if (index !== -1) {
@@ -121,6 +126,7 @@ export default function Practice() {
       if (cur + 1 < questions.length) {
         setCur(c => c + 1); setSelected(null); setFeedback(null); setTimeLeft(TIME_PER_Q)
       } else {
+        soundComplete(mode === 'ai' ? score > aiScore : pct >= 60)
         setScreen('results')
       }
     }, 1100)
@@ -177,6 +183,9 @@ export default function Practice() {
                 ))}
                 <button onClick={toggleDark} style={{ marginLeft: 4, padding: '6px 10px', borderRadius: 20, border: `1px solid ${c.cardBorder}`, background: dark ? 'rgba(255,255,255,0.08)' : '#f3f4f6', color: c.text, fontSize: 15, cursor: 'pointer' }}>
                   {dark ? '☀️' : '🌙'}
+                </button>
+                <button onClick={() => { const n = !soundOn; setSoundOn(n); setSoundsEnabled(n) }} style={{ padding: '6px 10px', borderRadius: 20, border: `1px solid ${c.cardBorder}`, background: dark ? 'rgba(255,255,255,0.08)' : '#f3f4f6', color: c.text, fontSize: 15, cursor: 'pointer' }} title={soundOn ? 'Σβήσε ήχους' : 'Άνοιξε ήχους'}>
+                  {soundOn ? '🔊' : '🔇'}
                 </button>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>

@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useTheme } from '../context/ThemeContext'
 import { supabase } from '../lib/supabase'
 import { questionsBySubject, subjectMeta, type Question } from '../lib/questions'
+import { soundCorrect, soundWrong, soundCountdown, soundGo, soundComplete } from '../lib/sounds'
 
 const QUESTION_COUNT = 10
 const TIME_PER_Q = 15
@@ -92,7 +93,8 @@ export default function Daily() {
   // Countdown
   useEffect(() => {
     if (screen !== 'countdown') return
-    if (countdown === 0) { const t = setTimeout(() => setScreen('game'), 400); return () => clearTimeout(t) }
+    if (countdown === 0) { soundGo(); const t = setTimeout(() => setScreen('game'), 400); return () => clearTimeout(t) }
+    soundCountdown()
     const t = setTimeout(() => setCountdown(n => n - 1), 900)
     return () => clearTimeout(t)
   }, [countdown, screen])
@@ -121,6 +123,7 @@ export default function Daily() {
 
     setSelected(index)
     setFeedback(index === -1 ? 'timeout' : isCorrect ? 'correct' : 'wrong')
+    if (index === -1 || !isCorrect) soundWrong(); else soundCorrect()
     if (isCorrect) { setScore(newScore); setCorrectCount(newCorrect) }
 
     const isLast = cur + 1 >= questions.length
@@ -131,6 +134,7 @@ export default function Daily() {
         const result = { score: newScore, correct: newCorrect }
         localStorage.setItem(`daily-${dateStr}`, JSON.stringify(result))
         setAlreadyDone(result)
+        soundComplete(newCorrect >= 7)
         setScreen('results')
       }
     }, 1100)

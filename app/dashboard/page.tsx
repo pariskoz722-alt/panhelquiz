@@ -433,7 +433,7 @@ export default function Dashboard() {
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 13, fontWeight: 500, color: c.text }}>vs {opp || 'Άγνωστος'}</div>
-                      <div style={{ fontSize: 11, color: c.textSub }}>{g.subject} · {myScore}-{oppScore}</div>
+                      <div style={{ fontSize: 11, color: c.textSub }}>{subjectMeta[g.subject]?.icon} {subjectMeta[g.subject]?.name || g.subject} · {myScore}-{oppScore}</div>
                     </div>
                     <div style={{ fontSize: 11, fontWeight: 700, color: won ? '#1D9E75' : '#A32D2D', flexShrink: 0 }}>
                       {won ? '+' : '-'}{g.elo_change} ELO

@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import { useToast } from '../components/Toast'
 import { pickQuestions } from '../lib/questions'
 import { getRank } from '../lib/ranks'
+import { soundCorrect, soundWrong, soundCountdown, soundGo, soundComplete } from '../lib/sounds'
 
 const QUICK_REACTIONS = ['👏', '🔥', '😤', '🤝', '💪', '😂']
 
@@ -191,7 +192,8 @@ export default function Game() {
 
   useEffect(() => {
     if (phase !== 'countdown') return
-    if (countdown <= 0) { setPhase('game'); return }
+    if (countdown <= 0) { soundGo(); setPhase('game'); return }
+    soundCountdown()
     const t = setTimeout(() => setCountdown(c => c - 1), 1000)
     return () => clearTimeout(t)
   }, [phase, countdown])
@@ -312,6 +314,7 @@ export default function Game() {
     const newScore = scoreYou + pts
     if (isCorrect) { setScoreYou(newScore); setYouCorrect(c => c + 1); updateRoomScore(newScore) }
     setFeedback(isCorrect ? 'correct' : 'wrong')
+    if (isCorrect) soundCorrect(); else soundWrong()
     if (!isCorrect) {
       setWrongAnswers(w => [...w, { q: questions[cur].q, correct: questions[cur].answers[questions[cur].correct], chosen: questions[cur].answers[i] }])
     }
@@ -321,12 +324,13 @@ export default function Game() {
   function handleTimeout() {
     setSelected(-1)
     setFeedback('timeout')
+    soundWrong()
     setWrongAnswers(w => [...w, { q: questions[cur].q, correct: questions[cur].answers[questions[cur].correct], chosen: '(χρόνος τέλος)' }])
     setTimeout(() => nextQ(scoreYou), 1600)
   }
 
   function nextQ(currentScore: number) {
-    if (cur + 1 >= questions.length) { setPhase('results'); finishGame(currentScore, scoreOpp); return }
+    if (cur + 1 >= questions.length) { soundComplete(currentScore > scoreOpp); setPhase('results'); finishGame(currentScore, scoreOpp); return }
     setCur(c => c + 1); setSelected(null); setFeedback(null); setTime(15)
   }
 

@@ -4,6 +4,8 @@ import { useTheme } from '../context/ThemeContext'
 import { supabase } from '../lib/supabase'
 import NotificationBell from '../components/NotificationBell'
 import { getRank } from '../lib/ranks'
+import { subjectMeta } from '../lib/questions'
+import { soundsEnabled, setSoundsEnabled } from '../lib/sounds'
 
 export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState<'stats' | 'history' | 'settings'>('stats')
@@ -19,6 +21,13 @@ export default function ProfilePage() {
   const [deleting, setDeleting] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [extras, setExtras] = useState({ subjectsPlayed: 0, streak: 0, perfectDaily: false })
+  const [eloHistory, setEloHistory] = useState<number[]>([])
+  const [hasMoreGames, setHasMoreGames] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [gamesOffset, setGamesOffset] = useState(0)
+  const [soundOn, setSoundOn] = useState(true)
+  useEffect(() => { setSoundOn(soundsEnabled()) }, [])
+  const PAGE_SIZE = 10
   const { dark, toggleDark } = useTheme()
 
   const c = {
@@ -65,13 +74,16 @@ export default function ProfilePage() {
       .select('*, player1:profiles!games_player1_id_fkey(username), player2:profiles!games_player2_id_fkey(username)')
       .or(`player1_id.eq.${user.id},player2_id.eq.${user.id}`)
       .order('created_at', { ascending: false })
-      .limit(5)
-    setRecentGames(games || [])
+      .limit(PAGE_SIZE + 1)
+    const gameSlice = (games || []).slice(0, PAGE_SIZE)
+    setRecentGames(gameSlice)
+    setHasMoreGames((games || []).length > PAGE_SIZE)
+    setGamesOffset(PAGE_SIZE)
 
-    // All games — for achievements
+    // All games — achievements + ELO history
     const { data: allGames } = await supabase
       .from('games')
-      .select('subject, created_at')
+      .select('subject, created_at, winner_id, elo_change')
       .or(`player1_id.eq.${user.id},player2_id.eq.${user.id}`)
       .order('created_at', { ascending: true })
 
@@ -94,7 +106,40 @@ export default function ProfilePage() {
     } catch {}
 
     setExtras({ subjectsPlayed: subjectsSet.size, streak: streakCount, perfectDaily })
+
+    // ELO history
+    const finished = (allGames || []).filter(g => g.winner_id !== null)
+    if (finished.length > 0 && profileData) {
+      let elo = profileData.elo
+      const pts: number[] = [elo]
+      for (let i = finished.length - 1; i >= 0; i--) {
+        const g = finished[i]
+        const ch = g.elo_change ?? (g.winner_id === user.id ? 18 : 14)
+        elo = g.winner_id === user.id ? elo - ch : elo + ch
+        pts.unshift(elo)
+      }
+      setEloHistory(pts.slice(-30))
+    } else if (profileData) {
+      setEloHistory([profileData.elo])
+    }
     setLoading(false)
+  }
+
+  async function loadMoreGames() {
+    setLoadingMore(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setLoadingMore(false); return }
+    const { data } = await supabase
+      .from('games')
+      .select('*, player1:profiles!games_player1_id_fkey(username), player2:profiles!games_player2_id_fkey(username)')
+      .or(`player1_id.eq.${user.id},player2_id.eq.${user.id}`)
+      .order('created_at', { ascending: false })
+      .range(gamesOffset, gamesOffset + PAGE_SIZE)
+    const more = data || []
+    setRecentGames(prev => [...prev, ...more.slice(0, PAGE_SIZE)])
+    setHasMoreGames(more.length > PAGE_SIZE)
+    setGamesOffset(o => o + PAGE_SIZE)
+    setLoadingMore(false)
   }
 
   async function handleSave() {
@@ -284,6 +329,46 @@ export default function ProfilePage() {
                       ))}
                     </div>
 
+                    {/* ELO Chart */}
+                    {eloHistory.length > 1 && (() => {
+                      const W = 500, H = 100, PX = 6, PY = 12
+                      const minE = Math.min(...eloHistory), maxE = Math.max(...eloHistory)
+                      const pad = (maxE - minE) * 0.12 || 10
+                      const lo = minE - pad, hi = maxE + pad, span = hi - lo, n = eloHistory.length
+                      const toX = (i: number) => PX + (i / Math.max(n - 1, 1)) * (W - PX * 2)
+                      const toY = (e: number) => H - PY - ((e - lo) / span) * (H - PY * 2)
+                      const pts = eloHistory.map((e, i) => ({ x: toX(i), y: toY(e) }))
+                      let d = `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`
+                      for (let i = 0; i < pts.length - 1; i++) {
+                        const p0 = pts[Math.max(i-1,0)], p1 = pts[i], p2 = pts[i+1], p3 = pts[Math.min(i+2,pts.length-1)]
+                        d += ` C ${(p1.x+(p2.x-p0.x)/5).toFixed(1)},${(p1.y+(p2.y-p0.y)/5).toFixed(1)} ${(p2.x-(p3.x-p1.x)/5).toFixed(1)},${(p2.y-(p3.y-p1.y)/5).toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`
+                      }
+                      const last = pts[pts.length - 1]
+                      const trend = eloHistory[eloHistory.length - 1] - eloHistory[0]
+                      return (
+                        <div style={{ background: c.card, border: `1px solid ${c.cardBorder}`, borderRadius: 16, padding: '16px 18px', marginBottom: 14 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: c.text }}>📈 Ιστορικό ELO</div>
+                            <div style={{ textAlign: 'right' }}>
+                              <div style={{ fontSize: 20, fontWeight: 900, color: '#1D9E75' }}>{eloHistory[eloHistory.length - 1]}</div>
+                              <div style={{ fontSize: 11, fontWeight: 700, color: trend >= 0 ? '#1D9E75' : '#ef4444' }}>{trend >= 0 ? '▲ +' : '▼ '}{trend}</div>
+                            </div>
+                          </div>
+                          <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="90" preserveAspectRatio="none" style={{ display: 'block' }}>
+                            <defs>
+                              <linearGradient id="pEloGrad" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#1D9E75" stopOpacity="0.25"/>
+                                <stop offset="100%" stopColor="#1D9E75" stopOpacity="0"/>
+                              </linearGradient>
+                            </defs>
+                            <path d={`${d} L ${last.x.toFixed(1)},${H} L ${pts[0].x.toFixed(1)},${H} Z`} fill="url(#pEloGrad)"/>
+                            <path d={d} fill="none" stroke="#1D9E75" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                            <circle cx={last.x} cy={last.y} r="4" fill="#1D9E75" stroke={dark ? '#0A0E14' : 'white'} strokeWidth="2"/>
+                          </svg>
+                        </div>
+                      )
+                    })()}
+
                     {/* Achievements */}
                     <div style={{ background: c.card, border: `1px solid ${c.cardBorder}`, borderRadius: 16, padding: 20 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
@@ -315,26 +400,35 @@ export default function ProfilePage() {
                       Δεν έχεις παίξει ακόμα! <a href="/lobby" style={{ color: '#1D9E75', fontWeight: 700 }}>Παίξε τώρα →</a>
                     </div>
                   ) : (
-                    <div style={{ overflowX: 'auto' }}>
-                      {recentGames.map((game, i) => {
-                        const isP1 = game.player1_id === profile?.id
-                        const opp = isP1 ? game.player2?.username : game.player1?.username
-                        const won = game.winner_id === profile?.id
-                        return (
-                          <div key={game.id} style={{ display: 'grid', gridTemplateColumns: '1fr 90px 110px 70px', minWidth: 380, padding: '16px 20px', borderBottom: i < recentGames.length - 1 ? `1px solid ${c.rowBorder}` : 'none', alignItems: 'center' }}>
-                            <div>
-                              <div style={{ fontSize: 14, fontWeight: 700, color: c.text }}>{opp || 'Άγνωστος'}</div>
-                              <div style={{ fontSize: 12, color: c.textSub }}>{new Date(game.created_at).toLocaleDateString('el-GR')}</div>
+                    <>
+                      <div style={{ overflowX: 'auto' }}>
+                        {recentGames.map((game, i) => {
+                          const isP1 = game.player1_id === profile?.id
+                          const opp = isP1 ? game.player2?.username : game.player1?.username
+                          const won = game.winner_id === profile?.id
+                          return (
+                            <div key={game.id} style={{ display: 'grid', gridTemplateColumns: '1fr 90px 110px 70px', minWidth: 380, padding: '16px 20px', borderBottom: i < recentGames.length - 1 ? `1px solid ${c.rowBorder}` : 'none', alignItems: 'center' }}>
+                              <div>
+                                <div style={{ fontSize: 14, fontWeight: 700, color: c.text }}>{opp || 'Άγνωστος'}</div>
+                                <div style={{ fontSize: 12, color: c.textSub }}>{new Date(game.created_at).toLocaleDateString('el-GR')}</div>
+                              </div>
+                              <div style={{ textAlign: 'center' }}>
+                                <span style={{ padding: '4px 10px', borderRadius: 20, fontSize: 12, fontWeight: 800, background: won ? 'rgba(29,158,117,0.1)' : 'rgba(239,68,68,0.1)', color: won ? '#1D9E75' : '#ef4444' }}>{won ? 'Νίκη' : 'Ήττα'}</span>
+                              </div>
+                              <div style={{ textAlign: 'center', fontSize: 13, color: c.textSub }}>{subjectMeta[game.subject]?.icon} {subjectMeta[game.subject]?.name || game.subject}</div>
+                              <div style={{ textAlign: 'right', fontSize: 15, fontWeight: 800, color: won ? '#1D9E75' : '#ef4444' }}>{won ? '+' : '-'}{game.elo_change}</div>
                             </div>
-                            <div style={{ textAlign: 'center' }}>
-                              <span style={{ padding: '4px 10px', borderRadius: 20, fontSize: 12, fontWeight: 800, background: won ? 'rgba(29,158,117,0.1)' : 'rgba(239,68,68,0.1)', color: won ? '#1D9E75' : '#ef4444' }}>{won ? 'Νίκη' : 'Ήττα'}</span>
-                            </div>
-                            <div style={{ textAlign: 'center', fontSize: 13, color: c.textSub }}>{game.subject}</div>
-                            <div style={{ textAlign: 'right', fontSize: 15, fontWeight: 800, color: won ? '#1D9E75' : '#ef4444' }}>{won ? '+' : '-'}{game.elo_change}</div>
-                          </div>
-                        )
-                      })}
-                    </div>
+                          )
+                        })}
+                      </div>
+                      {hasMoreGames && (
+                        <div style={{ padding: '14px 20px', textAlign: 'center', borderTop: `1px solid ${c.rowBorder}` }}>
+                          <button onClick={loadMoreGames} disabled={loadingMore} style={{ padding: '9px 24px', borderRadius: 10, background: 'transparent', border: `1px solid ${c.cardBorder}`, color: c.textSub, fontSize: 13, fontWeight: 600, cursor: loadingMore ? 'default' : 'pointer', fontFamily: 'inherit' }}>
+                            {loadingMore ? 'Φόρτωση...' : 'Φόρτωση περισσότερων'}
+                          </button>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               )}
@@ -371,6 +465,20 @@ export default function ProfilePage() {
                           ))}
                         </div>
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Ήχοι */}
+                  <div style={{ background: c.card, border: `1px solid ${c.cardBorder}`, borderRadius: 16, padding: 24 }}>
+                    <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 800, color: c.text }}>🔊 Προτιμήσεις</h3>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: c.text }}>Ήχοι παιχνιδιού</div>
+                        <div style={{ fontSize: 12, color: c.textSub, marginTop: 2 }}>Ήχοι σωστής/λάθος απάντησης</div>
+                      </div>
+                      <button onClick={() => { const n = !soundOn; setSoundOn(n); setSoundsEnabled(n) }} style={{ padding: '8px 18px', borderRadius: 20, border: `1px solid ${soundOn ? 'rgba(29,158,117,0.4)' : c.cardBorder}`, background: soundOn ? 'rgba(29,158,117,0.12)' : 'transparent', color: soundOn ? '#1D9E75' : c.textSub, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+                        {soundOn ? '🔊 Ενεργοί' : '🔇 Ανενεργοί'}
+                      </button>
                     </div>
                   </div>
 
