@@ -100,6 +100,7 @@ export default function Lobby() {
 
   async function createFriendRoom() {
     if (!profile) return
+    matchCancelledRef.current = false  // reset so realtime callback isn't silently swallowed
     const { data: room } = await supabase
       .from('game_rooms')
       .insert({ player1_id: profile.id, subject, mode, status: 'waiting' })
@@ -140,7 +141,19 @@ export default function Lobby() {
 
   async function acceptInvite() {
     if (!profile || !inviteRoom) return
-    await supabase.from('game_rooms').update({ player2_id: profile.id, status: 'ready' }).eq('id', inviteRoom.id)
+    // .eq('status','waiting') is the optimistic lock:
+    // only one concurrent acceptor wins — the second gets 0 rows back and bails
+    const { data: updated, error } = await supabase
+      .from('game_rooms')
+      .update({ player2_id: profile.id, status: 'ready' })
+      .eq('id', inviteRoom.id)
+      .eq('status', 'waiting')  // race guard: no-op if already accepted or cancelled
+      .select()
+    if (error || !updated || updated.length === 0) {
+      addToast({ type: 'error', title: 'Η πρόσκληση δεν είναι πλέον διαθέσιμη', message: 'Ακυρώθηκε ή κάποιος άλλος αποδέχτηκε πρώτος.' })
+      setScreen('lobby')
+      return
+    }
     setOpponent(inviteRoom.player1)
     setScreen('found')
     addToast({ type: 'info', title: 'Αποδοχή!', message: `vs ${inviteRoom.player1?.username}` })
@@ -150,8 +163,12 @@ export default function Lobby() {
   async function cancelInvite() {
     matchCancelledRef.current = true
     if (matchChannelRef.current) { supabase.removeChannel(matchChannelRef.current); matchChannelRef.current = null }
-    if (roomId) { await supabase.from('game_rooms').delete().eq('id', roomId); setRoomId(null) }
-    setInviteLink(''); setScreen('lobby')
+    if (roomId) {
+      // Only delete if still waiting — don't orphan a friend who already accepted
+      await supabase.from('game_rooms').delete().eq('id', roomId).eq('status', 'waiting')
+      setRoomId(null)
+    }
+    setInviteLink(''); setInviteRoom(null); setScreen('lobby')
   }
 
   async function fetchPlayerCounts() {
