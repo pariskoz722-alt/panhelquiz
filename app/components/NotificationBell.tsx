@@ -198,7 +198,7 @@ export default function NotificationBell() {
               </div>
             ) : notifications.map(n => (
               <div key={n.id}
-                onClick={() => { if (n.data?.room_id) window.location.href = `/game?room=${n.data.room_id}` }}
+                onClick={() => { if (n.data?.room_id) window.location.href = `/game?room=${n.data.room_id}${n.type === 'rematch' ? '&rematch=1' : ''}` }}
                 style={{
                   display: 'flex',
                   gap: 10,

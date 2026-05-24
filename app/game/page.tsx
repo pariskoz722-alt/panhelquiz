@@ -18,7 +18,7 @@ interface ChatMessage {
 }
 
 export default function Game() {
-  const [phase, setPhase] = useState<'countdown' | 'game' | 'results'>('countdown')
+  const [phase, setPhase] = useState<'loading' | 'waiting' | 'countdown' | 'game' | 'results'>('loading')
   const [countdown, setCountdown] = useState(3)
   const [cur, setCur] = useState(0)
   const [selected, setSelected] = useState<number | null>(null)
@@ -46,6 +46,7 @@ export default function Game() {
   const myProfileRef = useRef<any>(null)
   const oppProfileRef = useRef<any>(null)
   const isPlayer1Ref = useRef(false)
+  const scoreOppRef = useRef(0)          // always-current opponent score (avoids stale closure)
   const gameChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
   const { dark, toggleDark } = useTheme()
@@ -123,11 +124,28 @@ export default function Game() {
         const newRoom = payload.new
         const oppScore = p1 ? newRoom.score_p2 : newRoom.score_p1
         setScoreOpp(oppScore)
+        scoreOppRef.current = oppScore   // keep ref in sync so nextQ sees the latest value
         // Estimate opponent's correct answers (min 100pts, max 175pts per correct answer)
         setOppCorrect(Math.min(5, Math.round(oppScore / 125)))
         if (newRoom.status === 'finished') setPhase('results')
+        // Rematch: player2 joining updates status to 'in_progress', which wakes player1 out of 'waiting'
+        if (newRoom.status === 'in_progress') {
+          setCountdown(3)
+          setPhase(prev => prev === 'waiting' ? 'countdown' : prev)
+        }
       })
       .subscribe()
+
+    const isRematch = params.get('rematch') === '1'
+    if (isRematch && p1) {
+      setPhase('waiting')   // sender: wait for opponent to load their page
+    } else if (isRematch && !p1) {
+      // Recipient: signal we're here so player1 can start the countdown
+      await supabase.from('game_rooms').update({ status: 'in_progress' }).eq('id', roomId)
+      setPhase('countdown')
+    } else {
+      setPhase('countdown') // normal lobby game
+    }
   }
 
   // Chat realtime subscription
@@ -207,7 +225,7 @@ export default function Game() {
 
   async function updateRoomScore(newScore: number) {
     if (!currentRoomRef.current) return
-    const field = isPlayer1 ? 'score_p1' : 'score_p2'
+    const field = isPlayer1Ref.current ? 'score_p1' : 'score_p2'  // use ref — not stale state
     await supabase.from('game_rooms').update({ [field]: newScore }).eq('id', currentRoomRef.current.id)
   }
 
@@ -286,7 +304,7 @@ export default function Game() {
       message: `Πάτησε εδώ για να παίξεις → ${subjects_name_map[room.subject] || room.subject}`,
       data: { room_id: newRoom.id },
     })
-    window.location.href = `/game?room=${newRoom.id}`
+    window.location.href = `/game?room=${newRoom.id}&rematch=1`
   }
 
   async function shareResult() {
@@ -330,7 +348,8 @@ export default function Game() {
   }
 
   function nextQ(currentScore: number) {
-    if (cur + 1 >= questions.length) { soundComplete(currentScore > scoreOpp); setPhase('results'); finishGame(currentScore, scoreOpp); return }
+    const latestOppScore = scoreOppRef.current  // read ref — always current, never a stale closure
+    if (cur + 1 >= questions.length) { soundComplete(currentScore > latestOppScore); setPhase('results'); finishGame(currentScore, latestOppScore); return }
     setCur(c => c + 1); setSelected(null); setFeedback(null); setTime(15)
   }
 
@@ -375,6 +394,23 @@ export default function Game() {
       `}</style>
 
       <main style={{ minHeight: '100vh', background: c.bg, fontFamily: 'inherit', transition: 'background 0.3s ease', color: c.text }}>
+
+        {/* LOADING */}
+        {phase === 'loading' && (
+          <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: c.textSub, fontSize: 15 }}>
+            Φόρτωση...
+          </div>
+        )}
+
+        {/* WAITING FOR REMATCH OPPONENT */}
+        {phase === 'waiting' && (
+          <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: 20, gap: 16 }}>
+            <div style={{ fontSize: 48 }}>⏳</div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: c.text }}>Αναμονή αντιπάλου...</div>
+            <div style={{ fontSize: 14, color: c.textSub }}>Ο {oppProfile?.username || 'αντίπαλος'} δεν έχει ανοίξει το rematch ακόμα</div>
+            <a href="/lobby" style={{ marginTop: 12, padding: '12px 24px', background: c.card, border: `1px solid ${c.cardBorder}`, borderRadius: 12, color: c.textSub, textDecoration: 'none', fontSize: 14, fontWeight: 600 }}>← Πίσω στο Lobby</a>
+          </div>
+        )}
 
         {/* COUNTDOWN */}
         {phase === 'countdown' && (

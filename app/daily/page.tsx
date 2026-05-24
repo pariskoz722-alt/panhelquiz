@@ -77,17 +77,19 @@ export default function Daily() {
   }
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) { window.location.href = '/login'; return }
-      supabase.from('profiles').select('*').eq('id', user.id).single().then(({ data }) => setProfile(data))
-    })
     const { questions: qs, dateStr: ds } = buildDailyChallenge()
     setQuestions(qs)
     setDateStr(ds)
-    const saved = localStorage.getItem(`daily-${ds}`)
-    if (saved) {
-      try { setAlreadyDone(JSON.parse(saved)) } catch {}
-    }
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) { window.location.href = '/login'; return }
+      supabase.from('profiles').select('*').eq('id', user.id).single().then(({ data }) => setProfile(data))
+      // Only read localStorage after confirming auth — prevents a logged-out user
+      // on a shared device from seeing the previous user's completion status
+      const saved = localStorage.getItem(`daily-${ds}`)
+      if (saved) {
+        try { setAlreadyDone(JSON.parse(saved)) } catch {}
+      }
+    })
   }, [])
 
   // Countdown

@@ -110,7 +110,12 @@ export default function Practice() {
     setFeedback(index === -1 ? 'timeout' : isCorrect ? 'correct' : 'wrong')
     if (index === -1 || !isCorrect) soundWrong(); else soundCorrect()
 
-    if (isCorrect) { setScore(s => s + 100 + bonus); setCorrectCount(c => c + 1) }
+    // Compute new values locally so closures (setTimeout) see the correct result
+    const newScore = isCorrect ? score + 100 + bonus : score
+    const newCorrect = isCorrect ? correctCount + 1 : correctCount
+    const newAiScore = (mode === 'ai' && aiGetsIt) ? aiScore + 100 + aiTimeBonus : aiScore
+
+    if (isCorrect) { setScore(newScore); setCorrectCount(newCorrect) }
     else if (index !== -1) {
       setWrongAnswers(w => [...w, { q: q.q, correct: q.answers[q.correct], chosen: q.answers[index] }])
     } else {
@@ -118,7 +123,7 @@ export default function Practice() {
     }
 
     if (mode === 'ai' && aiGetsIt) {
-      setAiScore(s => s + 100 + aiTimeBonus)
+      setAiScore(newAiScore)
       setAiCorrectCount(c => c + 1)
     }
 
@@ -126,7 +131,9 @@ export default function Practice() {
       if (cur + 1 < questions.length) {
         setCur(c => c + 1); setSelected(null); setFeedback(null); setTimeLeft(TIME_PER_Q)
       } else {
-        soundComplete(mode === 'ai' ? score > aiScore : pct >= 60)
+        // Use locally-computed values — React state hasn't flushed yet at this point
+        const wonNow = mode === 'ai' ? newScore > newAiScore : newCorrect / questions.length >= 0.6
+        soundComplete(wonNow)
         setScreen('results')
       }
     }, 1100)
