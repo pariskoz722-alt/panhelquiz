@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import { supabase } from '../lib/supabase';
 import NotificationBell from '../components/NotificationBell';
+import { getRank } from '../lib/ranks';
 
 const SUBJECTS = ['Όλα', 'Μαθηματικά', 'Φυσική', 'Χημεία', 'Βιολογία', 'Ιστορία', 'Έκθεση'];
 const CLASSES = ['Όλες', "Α' Λυκείου", "Β' Λυκείου", "Γ' Λυκείου"];
@@ -316,7 +317,10 @@ export default function LeaderboardPage() {
                         </div>
                         <div>
                           <div style={{ fontSize: 14, fontWeight: 700, color: c.text }}>{player.username}</div>
-                          <div style={{ fontSize: 12, color: c.textSub }}>{["Α'", "Β'", "Γ'"][player.grade - 1]} Λυκείου</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                            <span style={{ fontSize: 11, color: c.textSub }}>{["Α'", "Β'", "Γ'"][player.grade - 1]} Λυκείου</span>
+                            {(() => { const r = getRank(player.elo || 1200); return <span style={{ padding: '1px 7px', borderRadius: 20, background: r.bg, border: `1px solid ${r.border}`, fontSize: 10, fontWeight: 700, color: r.color }}>{r.icon} {r.name}</span>; })()}
+                          </div>
                         </div>
                       </div>
                       <div style={{ textAlign: 'center', fontSize: 16, fontWeight: 800, color: '#1D9E75' }}>{player.elo}</div>
@@ -343,7 +347,10 @@ export default function LeaderboardPage() {
                     </div>
                     <div>
                       <div style={{ fontSize: 12, color: '#1D9E75', fontWeight: 700 }}>Η θέση σου</div>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: c.text }}>{myProfile.username} · #{myRank || '?'}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: c.text }}>{myProfile.username} · #{myRank || '?'}</span>
+                        {(() => { const r = getRank(myProfile.elo || 1200); return <span style={{ padding: '2px 9px', borderRadius: 20, background: r.bg, border: `1px solid ${r.border}`, fontSize: 11, fontWeight: 700, color: r.color }}>{r.icon} {r.name}</span>; })()}
+                      </div>
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 24 }}>
@@ -378,6 +385,7 @@ function PodiumCard({ player, rank, podiumHeight, delay, isFirst, dark, c }: {
   };
   const col = colors[rank];
   const winRate = Math.round((player.wins / Math.max(player.wins + player.losses, 1)) * 100);
+  const playerRank = getRank(player.elo || 1200);
 
   return (
     <div className="podium-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', animation: `fadeInUp 0.6s ease ${delay}s both`, width: isFirst ? 160 : 130 }}>
@@ -386,6 +394,7 @@ function PodiumCard({ player, rank, podiumHeight, delay, isFirst, dark, c }: {
       </div>
       <div style={{ fontSize: isFirst ? 15 : 13, fontWeight: 800, marginBottom: 2, textAlign: 'center', color: c.text }}>{player.username}</div>
       <div style={{ fontSize: isFirst ? 20 : 16, fontWeight: 900, color: '#1D9E75', marginBottom: 4 }}>{player.elo}</div>
+      <div style={{ padding: '2px 8px', borderRadius: 20, background: playerRank.bg, border: `1px solid ${playerRank.border}`, fontSize: 10, fontWeight: 700, color: playerRank.color, marginBottom: 4 }}>{playerRank.icon} {playerRank.name}</div>
       <div style={{ fontSize: 11, color: c.textSub, marginBottom: 10 }}>{winRate}% WR</div>
       <div style={{ width: '100%', height: podiumHeight, background: col.blockBg, border: `1px solid ${col.blockBorder}`, borderRadius: '8px 8px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <span style={{ fontSize: 28, fontWeight: 900, color: dark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)' }}>{rank}</span>

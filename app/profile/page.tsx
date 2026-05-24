@@ -26,7 +26,9 @@ export default function ProfilePage() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [gamesOffset, setGamesOffset] = useState(0)
   const [soundOn, setSoundOn] = useState(true)
-  useEffect(() => { setSoundOn(soundsEnabled()) }, [])
+  const [avatar, setAvatar] = useState('')
+  const [subjectStats, setSubjectStats] = useState<Record<string, { played: number; wins: number }>>({})
+  useEffect(() => { setSoundOn(soundsEnabled()); try { setAvatar(localStorage.getItem('avatar') || '') } catch {} }, [])
   const PAGE_SIZE = 10
   const { dark, toggleDark } = useTheme()
 
@@ -86,6 +88,15 @@ export default function ProfilePage() {
       .select('subject, created_at, winner_id, elo_change')
       .or(`player1_id.eq.${user.id},player2_id.eq.${user.id}`)
       .order('created_at', { ascending: true })
+
+    const sStats: Record<string, { played: number; wins: number }> = {}
+    for (const g of (allGames || [])) {
+      if (!g.subject) continue
+      if (!sStats[g.subject]) sStats[g.subject] = { played: 0, wins: 0 }
+      sStats[g.subject].played++
+      if (g.winner_id === user.id) sStats[g.subject].wins++
+    }
+    setSubjectStats(sStats)
 
     const subjectsSet = new Set((allGames || []).map(g => g.subject).filter(Boolean))
     const daySet = new Set((allGames || []).map(g => new Date(g.created_at).toISOString().split('T')[0]))
@@ -253,8 +264,8 @@ export default function ProfilePage() {
               {/* Hero */}
               <div style={{ background: c.card, border: `1px solid ${c.cardBorder}`, borderRadius: 20, padding: 32, marginBottom: 24, opacity: visible ? 1 : 0, transform: visible ? 'translateY(0)' : 'translateY(20px)', transition: 'all 0.6s ease', boxShadow: dark ? 'none' : '0 1px 4px rgba(0,0,0,0.06)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
-                  <div style={{ width: 80, height: 80, borderRadius: '50%', background: 'linear-gradient(135deg, #1D9E75, #0D6B4F)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, fontWeight: 900, color: '#fff', flexShrink: 0, animation: 'pulse-ring 3s infinite' }}>
-                    {profile?.username?.[0]?.toUpperCase() || '?'}
+                  <div style={{ width: 80, height: 80, borderRadius: '50%', background: 'linear-gradient(135deg, #1D9E75, #0D6B4F)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: avatar ? 40 : 32, fontWeight: 900, color: '#fff', flexShrink: 0, animation: 'pulse-ring 3s infinite' }}>
+                    {avatar || profile?.username?.[0]?.toUpperCase() || '?'}
                   </div>
                   <div style={{ flex: 1 }}>
                     {(() => {
@@ -369,6 +380,30 @@ export default function ProfilePage() {
                       )
                     })()}
 
+                    {/* Subject win rates */}
+                    {Object.keys(subjectStats).length > 0 && (
+                      <div style={{ background: c.card, border: `1px solid ${c.cardBorder}`, borderRadius: 16, padding: '16px 20px', marginBottom: 14 }}>
+                        <div style={{ fontSize: 13, fontWeight: 800, color: c.text, marginBottom: 14 }}>📚 Win Rate ανά μάθημα</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                          {Object.entries(subjectStats).sort((a, b) => b[1].played - a[1].played).map(([subj, data]) => {
+                            const wr = Math.round(data.wins / Math.max(data.played, 1) * 100)
+                            const meta = subjectMeta[subj]
+                            return (
+                              <div key={subj}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                                  <span style={{ fontSize: 13, fontWeight: 600, color: c.text }}>{meta?.icon} {meta?.name || subj}</span>
+                                  <span style={{ fontSize: 13, fontWeight: 800, color: wr >= 50 ? '#1D9E75' : '#ef4444' }}>{wr}% <span style={{ fontSize: 11, color: c.textMuted, fontWeight: 500 }}>({data.played} αγ.)</span></span>
+                                </div>
+                                <div style={{ height: 6, borderRadius: 6, background: dark ? 'rgba(255,255,255,0.08)' : '#e5e7eb', overflow: 'hidden' }}>
+                                  <div style={{ height: '100%', borderRadius: 6, width: `${wr}%`, background: wr >= 50 ? 'linear-gradient(90deg, #1D9E75, #22c55e)' : 'linear-gradient(90deg, #ef4444, #f87171)', transition: 'width 0.6s ease' }} />
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Achievements */}
                     <div style={{ background: c.card, border: `1px solid ${c.cardBorder}`, borderRadius: 16, padding: 20 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
@@ -467,6 +502,29 @@ export default function ProfilePage() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Avatar picker */}
+                  {(() => {
+                    const AVATAR_OPTIONS = ['🦁','🐯','🦊','🐺','🦅','🦋','⚡','🔥','❄️','🌊','🌟','💫','🏆','🎯','📚','🎓','🧠','👑','🦄','🎮']
+                    return (
+                      <div style={{ background: c.card, border: `1px solid ${c.cardBorder}`, borderRadius: 16, padding: 24 }}>
+                        <h3 style={{ margin: '0 0 6px', fontSize: 16, fontWeight: 800, color: c.text }}>😊 Avatar</h3>
+                        <p style={{ fontSize: 13, color: c.textSub, margin: '0 0 14px' }}>Διάλεξε ένα emoji ως avatar σου</p>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+                          {AVATAR_OPTIONS.map(e => (
+                            <button key={e} onClick={() => { setAvatar(e); try { localStorage.setItem('avatar', e) } catch {} }} style={{ width: 46, height: 46, borderRadius: 10, fontSize: 22, cursor: 'pointer', border: `2px solid ${avatar === e ? '#1D9E75' : c.inputBorder}`, background: avatar === e ? 'rgba(29,158,117,0.12)' : c.inputBg, fontFamily: 'inherit', transition: 'all 0.15s ease' }}>
+                              {e}
+                            </button>
+                          ))}
+                        </div>
+                        {avatar && (
+                          <button onClick={() => { setAvatar(''); try { localStorage.removeItem('avatar') } catch {} }} style={{ padding: '6px 14px', borderRadius: 8, background: 'transparent', border: `1px solid ${c.cardBorder}`, color: c.textSub, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                            ✕ Αφαίρεση avatar
+                          </button>
+                        )}
+                      </div>
+                    )
+                  })()}
 
                   {/* Ήχοι */}
                   <div style={{ background: c.card, border: `1px solid ${c.cardBorder}`, borderRadius: 16, padding: 24 }}>
