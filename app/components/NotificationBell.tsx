@@ -10,6 +10,7 @@ interface Notification {
   message: string | null
   read: boolean
   created_at: string
+  data?: { room_id?: string } | null
 }
 
 export default function NotificationBell() {
@@ -50,7 +51,7 @@ export default function NotificationBell() {
   async function fetchNotifications(uid: string) {
     const { data } = await supabase
       .from('notifications')
-      .select('id, type, title, message, read, created_at')
+      .select('id, type, title, message, read, created_at, data')
       .eq('user_id', uid)
       .order('created_at', { ascending: false })
       .limit(30)
@@ -93,6 +94,7 @@ export default function NotificationBell() {
       game_result: '🎮',
       match_found: '⚔️',
       rank_milestone: '🏆',
+      rematch: '⚔️',
       system: '📢',
     }
     return icons[type] ?? '🔔'
@@ -195,14 +197,17 @@ export default function NotificationBell() {
                 Δεν έχεις ειδοποιήσεις ακόμα
               </div>
             ) : notifications.map(n => (
-              <div key={n.id} style={{
-                display: 'flex',
-                gap: 10,
-                alignItems: 'flex-start',
-                padding: '12px 16px',
-                borderBottom: `1px solid ${c.rowBorder}`,
-                background: n.read ? 'transparent' : c.unreadBg,
-              }}>
+              <div key={n.id}
+                onClick={() => { if (n.data?.room_id) window.location.href = `/game?room=${n.data.room_id}` }}
+                style={{
+                  display: 'flex',
+                  gap: 10,
+                  alignItems: 'flex-start',
+                  padding: '12px 16px',
+                  borderBottom: `1px solid ${c.rowBorder}`,
+                  background: n.read ? 'transparent' : c.unreadBg,
+                  cursor: n.data?.room_id ? 'pointer' : 'default',
+                }}>
                 <span style={{ fontSize: 18, flexShrink: 0, marginTop: 1 }}>{typeIcon(n.type)}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: c.text, lineHeight: 1.3 }}>{n.title}</div>

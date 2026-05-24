@@ -4,6 +4,7 @@ import { useTheme } from '../context/ThemeContext'
 import { supabase } from '../lib/supabase'
 import { useToast } from '../components/Toast'
 import { pickQuestions } from '../lib/questions'
+import { getRank } from '../lib/ranks'
 
 const QUICK_REACTIONS = ['👏', '🔥', '😤', '🤝', '💪', '😂']
 
@@ -31,6 +32,8 @@ export default function Game() {
   const [oppProfile, setOppProfile] = useState<any>(null)
   const [isPlayer1, setIsPlayer1] = useState(false)
   const [questions, setQuestions] = useState<{ q: string; answers: string[]; correct: number }[]>([])
+  const [wrongAnswers, setWrongAnswers] = useState<{ q: string; correct: string; chosen: string }[]>([])
+  const [rematchSent, setRematchSent] = useState(false)
 
   // Chat state
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
@@ -264,6 +267,26 @@ export default function Game() {
     }
   }
 
+  async function startRematch() {
+    const me = myProfileRef.current
+    const opp = oppProfileRef.current
+    const room = currentRoomRef.current
+    if (!me || !opp || !room) return
+    setRematchSent(true)
+    const { data: newRoom } = await supabase
+      .from('game_rooms')
+      .insert({ player1_id: me.id, player2_id: opp.id, subject: room.subject, mode: room.mode || 'casual', status: 'ready' })
+      .select().single()
+    if (!newRoom) { setRematchSent(false); return }
+    await supabase.from('notifications').insert({
+      user_id: opp.id, type: 'rematch',
+      title: `⚔️ Rematch από ${me.username}!`,
+      message: `Πάτησε εδώ για να παίξεις → ${subjects_name_map[room.subject] || room.subject}`,
+      data: { room_id: newRoom.id },
+    })
+    window.location.href = `/game?room=${newRoom.id}`
+  }
+
   async function shareResult() {
     const won = scoreYou > scoreOpp
     const eloChange = won ? '+18' : scoreYou < scoreOpp ? '−14' : '±0'
@@ -289,12 +312,16 @@ export default function Game() {
     const newScore = scoreYou + pts
     if (isCorrect) { setScoreYou(newScore); setYouCorrect(c => c + 1); updateRoomScore(newScore) }
     setFeedback(isCorrect ? 'correct' : 'wrong')
+    if (!isCorrect) {
+      setWrongAnswers(w => [...w, { q: questions[cur].q, correct: questions[cur].answers[questions[cur].correct], chosen: questions[cur].answers[i] }])
+    }
     setTimeout(() => nextQ(newScore), 1600)
   }
 
   function handleTimeout() {
     setSelected(-1)
     setFeedback('timeout')
+    setWrongAnswers(w => [...w, { q: questions[cur].q, correct: questions[cur].answers[questions[cur].correct], chosen: '(χρόνος τέλος)' }])
     setTimeout(() => nextQ(scoreYou), 1600)
   }
 
@@ -354,21 +381,31 @@ export default function Game() {
               </button>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 40 }}>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#1D9E75', color: 'white', fontSize: 20, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 8px' }}>
-                  {myProfile?.username?.[0]?.toUpperCase() || '?'}
-                </div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: c.text }}>{myProfile?.username || 'Εσύ'}</div>
-                <div style={{ fontSize: 12, color: c.textSub }}>ELO {myProfile?.elo || 1200}</div>
-              </div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: c.textMuted }}>VS</div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#E6F1FB', color: '#185FA5', fontSize: 20, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 8px', border: '3px solid #378ADD' }}>
-                  {oppProfile?.username?.[0]?.toUpperCase() || '?'}
-                </div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: c.text }}>{oppProfile?.username || 'Αντίπαλος'}</div>
-                <div style={{ fontSize: 12, color: c.textSub }}>ELO {oppProfile?.elo || 1200}</div>
-              </div>
+              {(() => {
+                const myRank = getRank(myProfile?.elo || 1200)
+                const oppRank = getRank(oppProfile?.elo || 1200)
+                return (
+                  <>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#1D9E75', color: 'white', fontSize: 20, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 8px' }}>
+                        {myProfile?.username?.[0]?.toUpperCase() || '?'}
+                      </div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: c.text }}>{myProfile?.username || 'Εσύ'}</div>
+                      <div style={{ fontSize: 11, color: c.textSub }}>ELO {myProfile?.elo || 1200}</div>
+                      <div style={{ marginTop: 4, fontSize: 11, fontWeight: 700, color: myRank.color }}>{myRank.icon} {myRank.name}</div>
+                    </div>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: c.textMuted }}>VS</div>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#E6F1FB', color: '#185FA5', fontSize: 20, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 8px', border: '3px solid #378ADD' }}>
+                        {oppProfile?.username?.[0]?.toUpperCase() || '?'}
+                      </div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: c.text }}>{oppProfile?.username || 'Αντίπαλος'}</div>
+                      <div style={{ fontSize: 11, color: c.textSub }}>ELO {oppProfile?.elo || 1200}</div>
+                      <div style={{ marginTop: 4, fontSize: 11, fontWeight: 700, color: oppRank.color }}>{oppRank.icon} {oppRank.name}</div>
+                    </div>
+                  </>
+                )
+              })()}
             </div>
             <div className="countdown-num">{countdown === 0 ? 'GO!' : countdown}</div>
             <div style={{ fontSize: 16, color: c.textSub, marginTop: 12 }}>Ετοιμαστείτε!</div>
@@ -484,14 +521,33 @@ export default function Game() {
               <div style={{ background: scoreYou >= scoreOpp ? (dark ? 'rgba(29,158,117,0.15)' : '#E1F5EE') : (dark ? 'rgba(163,45,45,0.15)' : '#FCEBEB'), border: `1px solid ${scoreYou >= scoreOpp ? '#5DCAA5' : '#F09595'}`, borderRadius: 12, padding: '12px 20px', marginBottom: 24, fontSize: 15, fontWeight: 700, color: scoreYou >= scoreOpp ? '#0F6E56' : '#A32D2D' }}>
                 {scoreYou > scoreOpp ? '📈 +18 ELO' : scoreYou < scoreOpp ? '📉 -14 ELO' : '➡️ ±0 ELO'}
               </div>
-              <button onClick={shareResult} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', padding: '11px 20px', background: c.card, color: c.text, border: `1px solid ${c.cardBorder}`, borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', marginBottom: 10 }}>
-                📤 Κοινοποίηση αποτελέσματος
-              </button>
-              <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginBottom: 32 }}>
-                <a href="/lobby" style={{ flex: 1, padding: '14px', background: 'linear-gradient(135deg, #1D9E75, #0F6E56)', color: 'white', borderRadius: 12, fontSize: 15, fontWeight: 800, textDecoration: 'none', textAlign: 'center' }}>▶ Νέα παρτίδα</a>
-                <a href="/dashboard" style={{ padding: '14px 20px', background: c.card, color: c.textSub, border: `1px solid ${c.cardBorder}`, borderRadius: 12, fontSize: 15, textDecoration: 'none', fontWeight: 500 }}>Dashboard</a>
+              <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
+                <button onClick={startRematch} disabled={rematchSent} style={{ flex: 1, padding: '13px', background: rematchSent ? c.card : 'linear-gradient(135deg, #1D9E75, #0F6E56)', color: rematchSent ? c.textSub : 'white', border: rematchSent ? `1px solid ${c.cardBorder}` : 'none', borderRadius: 12, fontSize: 15, fontWeight: 800, cursor: rematchSent ? 'default' : 'pointer', fontFamily: 'inherit' }}>
+                  {rematchSent ? '✓ Αποστάλθηκε!' : '⚔️ Rematch'}
+                </button>
+                <button onClick={shareResult} style={{ padding: '13px 16px', background: c.card, color: c.text, border: `1px solid ${c.cardBorder}`, borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  📤
+                </button>
+              </div>
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginBottom: 24 }}>
+                <a href="/lobby" style={{ flex: 1, padding: '13px', background: c.card, color: c.text, border: `1px solid ${c.cardBorder}`, borderRadius: 12, fontSize: 14, fontWeight: 600, textDecoration: 'none', textAlign: 'center' }}>▶ Νέα παρτίδα</a>
+                <a href="/dashboard" style={{ padding: '13px 16px', background: c.card, color: c.textSub, border: `1px solid ${c.cardBorder}`, borderRadius: 12, fontSize: 14, textDecoration: 'none', fontWeight: 500 }}>Dashboard</a>
               </div>
             </div>
+
+            {/* Wrong answers review */}
+            {wrongAnswers.length > 0 && (
+              <div style={{ background: c.card, border: `1px solid ${c.cardBorder}`, borderRadius: 16, padding: '20px', marginBottom: 20 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: c.text, marginBottom: 14 }}>📋 Τα λάθη σου — μελέτησέ τα</div>
+                {wrongAnswers.map((w, i) => (
+                  <div key={i} style={{ marginBottom: 14, paddingBottom: 14, borderBottom: i < wrongAnswers.length - 1 ? `1px solid ${c.cardBorder}` : 'none' }}>
+                    <div style={{ fontSize: 13, color: c.text, fontWeight: 600, marginBottom: 6 }}>{w.q}</div>
+                    <div style={{ fontSize: 12, color: '#E24B4A' }}>Απάντησες: {w.chosen}</div>
+                    <div style={{ fontSize: 12, color: '#1D9E75', fontWeight: 700 }}>Σωστό: {w.correct}</div>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* POST-GAME CHAT */}
             <div style={{ background: c.card, border: `1px solid ${c.cardBorder}`, borderRadius: 20, overflow: 'hidden' }}>

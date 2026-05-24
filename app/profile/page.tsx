@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useTheme } from '../context/ThemeContext'
 import { supabase } from '../lib/supabase'
 import NotificationBell from '../components/NotificationBell'
+import { getRank } from '../lib/ranks'
 
 export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState<'stats' | 'history' | 'settings'>('stats')
@@ -17,6 +18,7 @@ export default function ProfilePage() {
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [extras, setExtras] = useState({ subjectsPlayed: 0, streak: 0, perfectDaily: false })
   const { dark, toggleDark } = useTheme()
 
   const c = {
@@ -65,6 +67,33 @@ export default function ProfilePage() {
       .order('created_at', { ascending: false })
       .limit(5)
     setRecentGames(games || [])
+
+    // All games — for achievements
+    const { data: allGames } = await supabase
+      .from('games')
+      .select('subject, created_at')
+      .or(`player1_id.eq.${user.id},player2_id.eq.${user.id}`)
+      .order('created_at', { ascending: true })
+
+    const subjectsSet = new Set((allGames || []).map(g => g.subject).filter(Boolean))
+    const daySet = new Set((allGames || []).map(g => new Date(g.created_at).toISOString().split('T')[0]))
+    const today = new Date().toISOString().split('T')[0]
+    let streakCount = 0
+    const cursor = new Date()
+    if (!daySet.has(today)) cursor.setDate(cursor.getDate() - 1)
+    while (daySet.has(cursor.toISOString().split('T')[0])) { streakCount++; cursor.setDate(cursor.getDate() - 1) }
+
+    const todayKey = `daily-${today}`
+    let perfectDaily = false
+    try {
+      const saved = localStorage.getItem(todayKey) || localStorage.getItem(Object.keys(localStorage).find(k => k.startsWith('daily-')) || '')
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (parsed.correct === 10) perfectDaily = true
+      }
+    } catch {}
+
+    setExtras({ subjectsPlayed: subjectsSet.size, streak: streakCount, perfectDaily })
     setLoading(false)
   }
 
@@ -183,10 +212,16 @@ export default function ProfilePage() {
                     {profile?.username?.[0]?.toUpperCase() || '?'}
                   </div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4, flexWrap: 'wrap' }}>
-                      <h1 style={{ margin: 0, fontSize: 26, fontWeight: 900, color: c.text }}>{profile?.username || 'Χρήστης'}</h1>
-                      <span style={{ padding: '3px 10px', borderRadius: 20, background: 'rgba(29,158,117,0.1)', border: '1px solid rgba(29,158,117,0.3)', fontSize: 12, fontWeight: 700, color: '#1D9E75' }}>🏆 {gradeLabel} Λυκείου</span>
-                    </div>
+                    {(() => {
+                      const rank = getRank(profile?.elo || 1200)
+                      return (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4, flexWrap: 'wrap' }}>
+                          <h1 style={{ margin: 0, fontSize: 26, fontWeight: 900, color: c.text }}>{profile?.username || 'Χρήστης'}</h1>
+                          <span style={{ padding: '3px 10px', borderRadius: 20, background: rank.bg, border: `1px solid ${rank.border}`, fontSize: 12, fontWeight: 700, color: rank.color }}>{rank.icon} {rank.name}</span>
+                          <span style={{ padding: '3px 10px', borderRadius: 20, background: 'rgba(29,158,117,0.1)', border: '1px solid rgba(29,158,117,0.3)', fontSize: 12, fontWeight: 700, color: '#1D9E75' }}>{gradeLabel} Λυκείου</span>
+                        </div>
+                      )
+                    })()}
                     <div style={{ fontSize: 14, color: c.textSub, marginBottom: 12 }}>
                       Μέλος από {new Date(profile?.created_at).toLocaleDateString('el-GR', { month: 'long', year: 'numeric' })}
                     </div>
@@ -218,24 +253,59 @@ export default function ProfilePage() {
               </div>
 
               {/* Stats */}
-              {activeTab === 'stats' && (
-                <div>
-                  <div className="profile-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 24 }}>
-                    {[
-                      { label: 'Νίκες', value: profile?.wins || 0, icon: '🏆', color: '#1D9E75' },
-                      { label: 'Ήττες', value: profile?.losses || 0, icon: '💔', color: '#ef4444' },
-                      { label: 'Win Rate', value: `${winRate}%`, icon: '📈', color: '#1D9E75' },
-                      { label: 'ELO', value: profile?.elo || 1200, icon: '⭐', color: '#f59e0b' },
-                    ].map(s => (
-                      <div key={s.label} className="stat-card" style={{ padding: '20px 16px', background: c.card, border: `1px solid ${c.cardBorder}`, borderRadius: 14, textAlign: 'center', boxShadow: dark ? 'none' : '0 1px 4px rgba(0,0,0,0.06)' }}>
-                        <div style={{ fontSize: 24, marginBottom: 6 }}>{s.icon}</div>
-                        <div style={{ fontSize: 26, fontWeight: 900, color: s.color }}>{s.value}</div>
-                        <div style={{ fontSize: 12, color: c.textMuted, marginTop: 4 }}>{s.label}</div>
+              {activeTab === 'stats' && (() => {
+                const ACHIEVEMENTS = [
+                  { icon: '🏆', name: 'Πρώτη Νίκη',       desc: 'Κέρδισε 1 παρτίδα',           unlocked: (profile?.wins || 0) >= 1 },
+                  { icon: '⚡', name: 'Πρώτη Δεκάδα',      desc: '10 παρτίδες',                   unlocked: (profile?.wins || 0) + (profile?.losses || 0) >= 10 },
+                  { icon: '🎖️', name: 'Αδάμαστος',          desc: '50 παρτίδες',                   unlocked: (profile?.wins || 0) + (profile?.losses || 0) >= 50 },
+                  { icon: '💪', name: 'Win Machine',         desc: 'Win rate ≥ 65% (min 10 παρτ.)', unlocked: (() => { const t = (profile?.wins||0)+(profile?.losses||0); return t >= 10 && Math.round((profile?.wins||0)/t*100) >= 65 })() },
+                  { icon: '🥇', name: 'Gold Rank',           desc: 'Φτάσε τα 1300 ELO',            unlocked: (profile?.elo || 1200) >= 1300 },
+                  { icon: '🔷', name: 'Platinum',            desc: 'Φτάσε τα 1500 ELO',            unlocked: (profile?.elo || 1200) >= 1500 },
+                  { icon: '💎', name: 'Diamond',             desc: 'Φτάσε τα 1700 ELO',            unlocked: (profile?.elo || 1200) >= 1700 },
+                  { icon: '📚', name: 'Πολυμαθής',           desc: 'Παίξε και στα 6 μαθήματα',     unlocked: extras.subjectsPlayed >= 6 },
+                  { icon: '🔥', name: 'Unstoppable',          desc: '7 μέρες streak',               unlocked: extras.streak >= 7 },
+                  { icon: '🎯', name: 'Τέλεια Ημερήσια',     desc: '10/10 στην ημερήσια πρόκληση', unlocked: extras.perfectDaily },
+                ]
+                const unlockedCount = ACHIEVEMENTS.filter(a => a.unlocked).length
+                return (
+                  <div>
+                    <div className="profile-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 24 }}>
+                      {[
+                        { label: 'Νίκες', value: profile?.wins || 0, icon: '🏆', color: '#1D9E75' },
+                        { label: 'Ήττες', value: profile?.losses || 0, icon: '💔', color: '#ef4444' },
+                        { label: 'Win Rate', value: `${winRate}%`, icon: '📈', color: '#1D9E75' },
+                        { label: 'ELO', value: profile?.elo || 1200, icon: '⭐', color: '#f59e0b' },
+                      ].map(s => (
+                        <div key={s.label} className="stat-card" style={{ padding: '20px 16px', background: c.card, border: `1px solid ${c.cardBorder}`, borderRadius: 14, textAlign: 'center', boxShadow: dark ? 'none' : '0 1px 4px rgba(0,0,0,0.06)' }}>
+                          <div style={{ fontSize: 24, marginBottom: 6 }}>{s.icon}</div>
+                          <div style={{ fontSize: 26, fontWeight: 900, color: s.color }}>{s.value}</div>
+                          <div style={{ fontSize: 12, color: c.textMuted, marginTop: 4 }}>{s.label}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Achievements */}
+                    <div style={{ background: c.card, border: `1px solid ${c.cardBorder}`, borderRadius: 16, padding: 20 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                        <div style={{ fontSize: 14, fontWeight: 800, color: c.text }}>🎖️ Achievements</div>
+                        <div style={{ fontSize: 12, color: c.textSub, background: c.tabBg, border: `1px solid ${c.tabBorder}`, borderRadius: 20, padding: '3px 10px' }}>{unlockedCount}/{ACHIEVEMENTS.length}</div>
                       </div>
-                    ))}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+                        {ACHIEVEMENTS.map(a => (
+                          <div key={a.name} className="achievement" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 12, background: a.unlocked ? (dark ? 'rgba(29,158,117,0.1)' : '#f0faf6') : (dark ? 'rgba(255,255,255,0.03)' : '#f9fafb'), border: `1px solid ${a.unlocked ? 'rgba(29,158,117,0.3)' : c.cardBorder}`, opacity: a.unlocked ? 1 : 0.55 }}>
+                            <div style={{ fontSize: 24, filter: a.unlocked ? 'none' : 'grayscale(1)', flexShrink: 0 }}>{a.icon}</div>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontSize: 13, fontWeight: 700, color: a.unlocked ? (dark ? '#fff' : '#111') : c.textSub, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.name}</div>
+                              <div style={{ fontSize: 11, color: c.textMuted }}>{a.desc}</div>
+                            </div>
+                            {a.unlocked && <div style={{ marginLeft: 'auto', flexShrink: 0, color: '#1D9E75', fontSize: 14 }}>✓</div>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              )}
+                )
+              })()}
 
               {/* History */}
               {activeTab === 'history' && (

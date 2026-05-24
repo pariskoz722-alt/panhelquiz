@@ -4,6 +4,7 @@ import { useTheme } from '../context/ThemeContext'
 import { supabase } from '../lib/supabase'
 import NotificationBell from '../components/NotificationBell'
 import { subjectMeta } from '../lib/questions'
+import { getRank } from '../lib/ranks'
 
 export default function Dashboard() {
   const [menuOpen, setMenuOpen] = useState(false)
@@ -252,7 +253,7 @@ export default function Dashboard() {
           {/* Stats */}
           <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 16 }}>
             {[
-              { label: 'ELO', val: profile?.elo || 1200, sub: 'Βαθμολογία σου', color: '#1D9E75' },
+              { label: 'ELO', val: profile?.elo || 1200, sub: (() => { const r = getRank(profile?.elo || 1200); return `${r.icon} ${r.name}` })(), color: '#1D9E75' },
               { label: 'Παρτίδες', val: (profile?.wins || 0) + (profile?.losses || 0), sub: `${profile?.wins || 0} νίκες · ${profile?.losses || 0} ήττες`, color: '#185FA5' },
               { label: 'Νίκες %', val: `${winRate}%`, sub: 'Win rate', color: '#534AB7' },
               { label: streak.count > 0 ? `${streak.count}🔥` : gradeLabel, val: streak.count > 0 ? (streak.playedToday ? '🔥 Active' : '⚠️ Κίνδυνος') : 'Λυκείου', sub: streak.count > 0 ? `${streak.count} ${streak.count === 1 ? 'ημέρα' : 'ημέρες'} streak` : gradeLabel + ' Λυκείου', color: streak.count > 0 ? '#BA7517' : '#BA7517' },
