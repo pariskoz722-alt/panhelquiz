@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useTheme } from '../context/ThemeContext'
 import { supabase } from '../lib/supabase'
 import { pickQuestions, subjectMeta, type Question } from '../lib/questions'
+import { explanations } from '../lib/explanations'
 import NotificationBell from '../components/NotificationBell'
 
 const QUESTION_COUNT = 10
@@ -421,6 +422,11 @@ export default function Practice() {
               {feedback && (
                 <div className="feedback-bar" style={{ background: feedback === 'correct' ? '#E1F5EE' : feedback === 'wrong' ? '#FCEBEB' : '#FAEEDA', color: feedback === 'correct' ? '#0F6E56' : feedback === 'wrong' ? '#A32D2D' : '#633806' }}>
                   {feedback === 'correct' ? `✓ Σωστό! +${100 + timeLeft * 5} πόντοι` : feedback === 'wrong' ? `✗ Λάθος! Σωστό: ${curQ.answers[curQ.correct]}` : `⏱ Τέλος χρόνου! Σωστό: ${curQ.answers[curQ.correct]}`}
+                </div>
+              )}
+              {feedback && explanations[subject]?.[curQ.q] && (
+                <div style={{ marginTop: 8, padding: '10px 14px', borderRadius: 10, background: dark ? 'rgba(255,255,255,0.04)' : '#f0faf6', border: `1px solid ${dark ? 'rgba(29,158,117,0.2)' : '#c6e8d8'}`, fontSize: 13, color: c.textSub, lineHeight: 1.5, animation: 'slideUp 0.3s ease' }}>
+                  💡 {explanations[subject][curQ.q]}
                 </div>
               )}
             </div>

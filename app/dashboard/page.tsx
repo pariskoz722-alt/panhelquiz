@@ -14,10 +14,17 @@ export default function Dashboard() {
   const [subjectStats, setSubjectStats] = useState<Record<string, { wins: number; losses: number }>>({})
   const [eloHistory, setEloHistory] = useState<number[]>([])
   const [streak, setStreak] = useState<{ count: number; playedToday: boolean }>({ count: 0, playedToday: false })
+  const [dailyDone, setDailyDone] = useState<{ score: number; correct: number } | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     loadData()
+    // Check daily challenge completion (localStorage, client-only)
+    const today = new Date().toISOString().split('T')[0]
+    const saved = localStorage.getItem(`daily-${today}`)
+    if (saved) {
+      try { setDailyDone(JSON.parse(saved)) } catch {}
+    }
   }, [])
 
   async function loadData() {
@@ -223,6 +230,24 @@ export default function Dashboard() {
               )}
             </div>
           )}
+
+          {/* Daily challenge card */}
+          <div style={{ background: dailyDone ? (dark ? 'rgba(29,158,117,0.1)' : '#E1F5EE') : c.card, border: `1px solid ${dailyDone ? '#5DCAA5' : c.cardBorder}`, borderRadius: 12, padding: '12px 16px', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 22 }}>📅</span>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: dailyDone ? '#0F6E56' : c.text }}>Ημερήσια Πρόκληση</div>
+                <div style={{ fontSize: 12, color: c.textSub }}>
+                  {dailyDone
+                    ? `✓ Σήμερα: ${dailyDone.correct}/10 σωστές · ${dailyDone.score} πόντοι`
+                    : 'Νέα πρόκληση — ίδιες ερωτήσεις για όλους!'}
+                </div>
+              </div>
+            </div>
+            <a href="/daily" style={{ flexShrink: 0, background: dailyDone ? 'transparent' : '#1D9E75', color: dailyDone ? '#1D9E75' : 'white', padding: '8px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, textDecoration: 'none', border: dailyDone ? '1px solid #5DCAA5' : 'none', whiteSpace: 'nowrap' }}>
+              {dailyDone ? 'Δες →' : 'Παίξε →'}
+            </a>
+          </div>
 
           {/* Stats */}
           <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 16 }}>

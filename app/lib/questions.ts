@@ -1,4 +1,4 @@
-export type Question = { q: string; answers: string[]; correct: number }
+export type Question = { q: string; answers: string[]; correct: number; explanation?: string }
 
 export const questionsBySubject: Record<string, Question[]> = {
   math: [

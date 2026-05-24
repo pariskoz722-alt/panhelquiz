@@ -264,6 +264,22 @@ export default function Game() {
     }
   }
 
+  async function shareResult() {
+    const won = scoreYou > scoreOpp
+    const eloChange = won ? '+18' : scoreYou < scoreOpp ? '−14' : '±0'
+    const oppName = oppProfileRef.current?.username || 'Αντίπαλος'
+    const subjectName = subjects_name_map[room?.subject] || room?.subject || 'Quiz'
+    const text = `${won ? '🏆 Νίκη' : scoreYou < scoreOpp ? '😤 Ήττα' : '🤝 Ισοπαλία'} στο PanhelQuiz!\nvs ${oppName} · ${subjectName}\n${scoreYou}–${scoreOpp} · ${eloChange} ELO\n\npanhelquiz.vercel.app`
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'PanhelQuiz', text })
+      } else {
+        await navigator.clipboard.writeText(text)
+        addToast({ type: 'success', title: 'Αντιγράφηκε!', message: 'Κοινοποίησε το αποτέλεσμά σου.' })
+      }
+    } catch {}
+  }
+
   function pick(i: number) {
     if (selected !== null || phase !== 'game') return
     setSelected(i)
@@ -468,6 +484,9 @@ export default function Game() {
               <div style={{ background: scoreYou >= scoreOpp ? (dark ? 'rgba(29,158,117,0.15)' : '#E1F5EE') : (dark ? 'rgba(163,45,45,0.15)' : '#FCEBEB'), border: `1px solid ${scoreYou >= scoreOpp ? '#5DCAA5' : '#F09595'}`, borderRadius: 12, padding: '12px 20px', marginBottom: 24, fontSize: 15, fontWeight: 700, color: scoreYou >= scoreOpp ? '#0F6E56' : '#A32D2D' }}>
                 {scoreYou > scoreOpp ? '📈 +18 ELO' : scoreYou < scoreOpp ? '📉 -14 ELO' : '➡️ ±0 ELO'}
               </div>
+              <button onClick={shareResult} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', padding: '11px 20px', background: c.card, color: c.text, border: `1px solid ${c.cardBorder}`, borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', marginBottom: 10 }}>
+                📤 Κοινοποίηση αποτελέσματος
+              </button>
               <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginBottom: 32 }}>
                 <a href="/lobby" style={{ flex: 1, padding: '14px', background: 'linear-gradient(135deg, #1D9E75, #0F6E56)', color: 'white', borderRadius: 12, fontSize: 15, fontWeight: 800, textDecoration: 'none', textAlign: 'center' }}>▶ Νέα παρτίδα</a>
                 <a href="/dashboard" style={{ padding: '14px 20px', background: c.card, color: c.textSub, border: `1px solid ${c.cardBorder}`, borderRadius: 12, fontSize: 15, textDecoration: 'none', fontWeight: 500 }}>Dashboard</a>
@@ -559,4 +578,9 @@ export default function Game() {
 const subjects_map: Record<string, string> = {
   math: '∑', physics: '⚛', chemistry: '⚗',
   history: '📜', biology: '🧬', lit: '✍'
+}
+
+const subjects_name_map: Record<string, string> = {
+  math: 'Μαθηματικά', physics: 'Φυσική', chemistry: 'Χημεία',
+  history: 'Ιστορία', biology: 'Βιολογία', lit: 'Έκθεση'
 }
