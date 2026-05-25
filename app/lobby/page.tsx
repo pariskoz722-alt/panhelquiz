@@ -54,7 +54,9 @@ export default function Lobby() {
     loadProfile()
     // Real-time ενημέρωση player counts
     const ch = supabase.channel('lobby-rooms')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'game_rooms' }, fetchPlayerCounts)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'game_rooms' }, fetchPlayerCounts)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'game_rooms' }, fetchPlayerCounts)
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'game_rooms' }, fetchPlayerCounts)
       .subscribe()
     return () => { supabase.removeChannel(ch) }
   }, [])
@@ -181,10 +183,10 @@ export default function Lobby() {
       .gte('created_at', cutoff)
 
     const counts: Record<string, number> = {}
+    BASE_SUBJECTS.forEach(s => { counts[s.id] = 0 })
     for (const r of activeRooms || []) {
       if (r.subject) counts[r.subject] = (counts[r.subject] || 0) + (r.status === 'ready' ? 2 : 1)
     }
-    // If a subject has 0 active players it simply won't be in counts → shows "Παίξε πρώτος!"
     setPlayerCounts(counts)
   }
 
