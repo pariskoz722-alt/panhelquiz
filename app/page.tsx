@@ -133,7 +133,7 @@ export default function Home() {
           display: flex; align-items: center; gap: 8px;
           font-size: 13px; font-weight: 500; transition: all 0.2s;
         }
-        .subject-pill:hover { border-color: #1D9E75 !important; background: #E1F5EE !important; color: #0F6E56 !important; transform: scale(1.03); }
+        .subject-pill:hover { border-color: #1D9E75 !important; background: rgba(29,158,117,0.15) !important; color: #1D9E75 !important; transform: scale(1.03); }
         .gradient-text {
           background: linear-gradient(135deg, #1D9E75, #0F8060);
           -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;

@@ -172,38 +172,19 @@ export default function Lobby() {
   }
 
   async function fetchPlayerCounts() {
-    // Αριθμός αναμενόμενων παικτών ανά μάθημα (active waiting rooms)
-    const { data: waitingRooms } = await supabase
+    // Count actual players in active rooms:
+    // 'waiting' = 1 player searching, 'ready' = 2 players matched
+    const { data: activeRooms } = await supabase
       .from('game_rooms')
-      .select('subject')
+      .select('subject, status')
       .in('status', ['waiting', 'ready'])
 
-    const liveCounts: Record<string, number> = {}
-    for (const r of waitingRooms || []) {
-      if (r.subject) liveCounts[r.subject] = (liveCounts[r.subject] || 0) + 1
+    const counts: Record<string, number> = {}
+    for (const r of activeRooms || []) {
+      if (r.subject) counts[r.subject] = (counts[r.subject] || 0) + (r.status === 'ready' ? 2 : 1)
     }
-
-    // Αν δεν υπάρχουν live rooms, δείξε συνολικούς μοναδικούς παίκτες ανά μάθημα
-    const hasLive = Object.keys(liveCounts).length > 0
-    if (!hasLive) {
-      const { data: games } = await supabase
-        .from('games')
-        .select('subject, player1_id, player2_id')
-      const allCounts: Record<string, Set<string>> = {}
-      for (const g of games || []) {
-        if (!g.subject) continue
-        if (!allCounts[g.subject]) allCounts[g.subject] = new Set()
-        if (g.player1_id) allCounts[g.subject].add(g.player1_id)
-        if (g.player2_id) allCounts[g.subject].add(g.player2_id)
-      }
-      const totals: Record<string, number> = {}
-      for (const [subj, players] of Object.entries(allCounts)) {
-        totals[subj] = players.size
-      }
-      setPlayerCounts(totals)
-    } else {
-      setPlayerCounts(liveCounts)
-    }
+    // If a subject has 0 active players it simply won't be in counts → shows "Παίξε πρώτος!"
+    setPlayerCounts(counts)
   }
 
   async function findMatch() {
