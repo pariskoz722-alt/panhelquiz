@@ -172,12 +172,13 @@ export default function Lobby() {
   }
 
   async function fetchPlayerCounts() {
-    // Count actual players in active rooms:
-    // 'waiting' = 1 player searching, 'ready' = 2 players matched
+    // Only count rooms created in the last 10 minutes — anything older is an abandoned/stale row
+    const cutoff = new Date(Date.now() - 10 * 60 * 1000).toISOString()
     const { data: activeRooms } = await supabase
       .from('game_rooms')
       .select('subject, status')
       .in('status', ['waiting', 'ready'])
+      .gte('created_at', cutoff)
 
     const counts: Record<string, number> = {}
     for (const r of activeRooms || []) {
