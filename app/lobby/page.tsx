@@ -35,6 +35,8 @@ export default function Lobby() {
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const matchChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
   const matchCancelledRef = useRef(false)
+  const roomIdRef = useRef<string | null>(null)
+  const screenRef = useRef<string>('lobby')
 
   const c = {
     bg: dark ? '#0A0E14' : '#f9fafb',
@@ -52,14 +54,38 @@ export default function Lobby() {
 
   useEffect(() => {
     loadProfile()
-    // Real-time ενημέρωση player counts
     const ch = supabase.channel('lobby-rooms')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'game_rooms' }, fetchPlayerCounts)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'game_rooms' }, fetchPlayerCounts)
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'game_rooms' }, fetchPlayerCounts)
       .subscribe()
-    return () => { supabase.removeChannel(ch) }
+
+    // Delete room if user closes tab while searching/waiting — keepalive ensures
+    // the request completes even as the page unloads
+    const handlePageHide = () => {
+      const id = roomIdRef.current
+      const s = screenRef.current
+      if (!id || !['matching', 'invite_waiting'].includes(s)) return
+      const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/game_rooms?id=eq.${id}&status=eq.waiting`
+      fetch(url, {
+        method: 'DELETE',
+        keepalive: true,
+        headers: {
+          apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+          Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+        },
+      })
+    }
+    window.addEventListener('pagehide', handlePageHide)
+
+    return () => {
+      supabase.removeChannel(ch)
+      window.removeEventListener('pagehide', handlePageHide)
+    }
   }, [])
+
+  useEffect(() => { roomIdRef.current = roomId }, [roomId])
+  useEffect(() => { screenRef.current = screen }, [screen])
 
   useEffect(() => {
     if (screen !== 'matching') return
