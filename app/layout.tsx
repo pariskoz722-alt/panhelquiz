@@ -73,16 +73,6 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="el" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
-      <head>
-        <style dangerouslySetInnerHTML={{ __html: `html { visibility: hidden }` }} />
-        <script dangerouslySetInnerHTML={{ __html: `
-          try {
-            if (localStorage.getItem('panhelquiz-theme') === 'dark') {
-              document.documentElement.style.background = '#0A0E14';
-            }
-          } catch(e) {}
-        `}} />
-      </head>
       <body className="min-h-full flex flex-col">
         <ThemeProvider>
           <ToastProvider>

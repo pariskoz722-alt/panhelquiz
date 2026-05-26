@@ -1,5 +1,9 @@
 'use client'
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useLayoutEffect, useState } from 'react'
+
+// useLayoutEffect runs synchronously before the browser paints — no flash
+// useEffect fallback for SSR where window/DOM don't exist
+const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect
 
 const ThemeContext = createContext({
   dark: false,
@@ -8,21 +12,10 @@ const ThemeContext = createContext({
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [dark, setDark] = useState(false)
-  const [ready, setReady] = useState(false)
 
-  // Step 1: read localStorage and batch both updates in one render
-  useEffect(() => {
-    const saved = localStorage.getItem('panhelquiz-theme')
-    if (saved === 'dark') setDark(true)
-    setReady(true) // React 18 batches this with setDark → single re-render
+  useIsomorphicLayoutEffect(() => {
+    if (localStorage.getItem('panhelquiz-theme') === 'dark') setDark(true)
   }, [])
-
-  // Step 2: runs AFTER the re-render with the correct dark value
-  useEffect(() => {
-    if (ready) {
-      document.documentElement.style.visibility = 'visible'
-    }
-  }, [ready, dark])
 
   const toggleDark = () => {
     setDark(prev => {
