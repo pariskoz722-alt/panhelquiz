@@ -1,8 +1,6 @@
 'use client'
 import { createContext, useContext, useEffect, useLayoutEffect, useState } from 'react'
 
-// useLayoutEffect runs synchronously before the browser paints — no flash
-// useEffect fallback for SSR where window/DOM don't exist
 const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect
 
 const ThemeContext = createContext({
@@ -13,14 +11,19 @@ const ThemeContext = createContext({
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [dark, setDark] = useState(false)
 
+  // Reads data-theme set by the inline <script> — runs before first paint
   useIsomorphicLayoutEffect(() => {
-    if (localStorage.getItem('panhelquiz-theme') === 'dark') setDark(true)
+    setDark(document.documentElement.dataset.theme === 'dark')
   }, [])
 
   const toggleDark = () => {
     setDark(prev => {
-      localStorage.setItem('panhelquiz-theme', !prev ? 'dark' : 'light')
-      return !prev
+      const next = !prev
+      const t = next ? 'dark' : 'light'
+      localStorage.setItem('panhelquiz-theme', t)
+      document.documentElement.dataset.theme = t
+      document.documentElement.style.colorScheme = t
+      return next
     })
   }
 

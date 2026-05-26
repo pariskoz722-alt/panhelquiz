@@ -72,7 +72,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="el" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+    <html lang="el" suppressHydrationWarning className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: `(function(){try{var s=localStorage.getItem('panhelquiz-theme');var p=window.matchMedia('(prefers-color-scheme: dark)').matches;var dark=s==='dark'||(!s&&p);var t=dark?'dark':'light';document.documentElement.dataset.theme=t;document.documentElement.style.colorScheme=t;}catch(e){}})();` }} />
+      </head>
       <body className="min-h-full flex flex-col">
         <ThemeProvider>
           <ToastProvider>
