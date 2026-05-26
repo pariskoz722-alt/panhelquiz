@@ -233,6 +233,13 @@ export default function Lobby() {
     }
 
     const { room_id, is_player1 } = data[0]
+
+    // User pressed cancel while RPC was still running — delete the room and bail
+    if (matchCancelledRef.current) {
+      await supabase.from('game_rooms').delete().eq('id', room_id)
+      return
+    }
+
     setRoomId(room_id)
 
     if (!is_player1) {
