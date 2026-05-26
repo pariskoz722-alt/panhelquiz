@@ -143,14 +143,11 @@ export default function Lobby() {
 
   async function acceptInvite() {
     if (!profile || !inviteRoom) return
-    // .eq('status','waiting') is the optimistic lock:
-    // only one concurrent acceptor wins — the second gets 0 rows back and bails
+    // RPC is SECURITY DEFINER — bypasses RLS so player2 can update a room they don't own.
+    // The race guard (status = 'waiting') is enforced inside the function.
     const { data: updated, error } = await supabase
-      .from('game_rooms')
-      .update({ player2_id: profile.id, status: 'ready' })
-      .eq('id', inviteRoom.id)
-      .eq('status', 'waiting')  // race guard: no-op if already accepted or cancelled
-      .select()
+      .rpc('accept_friend_invite', { p_room_id: inviteRoom.id })
+    console.log('acceptInvite result:', { updated, error, inviteRoomId: inviteRoom.id, profileId: profile.id })
     if (error || !updated || updated.length === 0) {
       addToast({ type: 'error', title: 'Η πρόσκληση δεν είναι πλέον διαθέσιμη', message: 'Ακυρώθηκε ή κάποιος άλλος αποδέχτηκε πρώτος.' })
       setScreen('lobby')
