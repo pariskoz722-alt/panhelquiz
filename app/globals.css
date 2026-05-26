@@ -22,3 +22,11 @@ body {
   transition: background 0.25s ease;
 }
 
+/* Prevent SSR white flash: overrides inline style="background:#f9fafb" on <main>
+   before React hydrates. Script sets data-theme before body renders, so this
+   takes effect immediately. Once React hydrates with dark=true, inline style
+   matches this value — no visible change, no flash. */
+html[data-theme="dark"] main {
+  background: #0A0E14 !important;
+}
+
