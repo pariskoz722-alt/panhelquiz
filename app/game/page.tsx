@@ -35,6 +35,7 @@ export default function Game() {
   const [questions, setQuestions] = useState<{ q: string; answers: string[]; correct: number }[]>([])
   const [wrongAnswers, setWrongAnswers] = useState<{ q: string; correct: string; chosen: string }[]>([])
   const [rematchSent, setRematchSent] = useState(false)
+  const [rematchIncoming, setRematchIncoming] = useState<{ roomId: string; from: string } | null>(null)
 
   // Chat state
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
@@ -147,6 +148,21 @@ export default function Game() {
       setPhase('countdown') // normal lobby game
     }
   }
+
+  // Listen for incoming rematch notification on results screen
+  useEffect(() => {
+    if (phase !== 'results' || !myProfileRef.current) return
+    const ch = supabase
+      .channel(`rematch-in-${myProfileRef.current.id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${myProfileRef.current.id}` }, (payload) => {
+        const n = payload.new as any
+        if (n.type === 'rematch' && n.data?.room_id) {
+          setRematchIncoming({ roomId: n.data.room_id, from: oppProfileRef.current?.username || 'Αντίπαλος' })
+        }
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [phase])
 
   // Chat realtime subscription
   useEffect(() => {
@@ -561,6 +577,17 @@ export default function Game() {
               <div style={{ background: scoreYou >= scoreOpp ? (dark ? 'rgba(29,158,117,0.15)' : '#E1F5EE') : (dark ? 'rgba(163,45,45,0.15)' : '#FCEBEB'), border: `1px solid ${scoreYou >= scoreOpp ? '#5DCAA5' : '#F09595'}`, borderRadius: 12, padding: '12px 20px', marginBottom: 24, fontSize: 15, fontWeight: 700, color: scoreYou >= scoreOpp ? '#0F6E56' : '#A32D2D' }}>
                 {scoreYou > scoreOpp ? '📈 +18 ELO' : scoreYou < scoreOpp ? '📉 -14 ELO' : '➡️ ±0 ELO'}
               </div>
+              {rematchIncoming && (
+                <div style={{ marginBottom: 12, padding: '14px 16px', background: 'linear-gradient(135deg, rgba(29,158,117,0.15), rgba(29,158,117,0.05))', border: '2px solid #1D9E75', borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: '#1D9E75' }}>⚔️ {rematchIncoming.from} ζητάει rematch!</div>
+                    <div style={{ fontSize: 12, color: c.textSub, marginTop: 2 }}>Αποδέξου για να ξεκινήσει αμέσως</div>
+                  </div>
+                  <button onClick={() => { window.location.href = `/game?room=${rematchIncoming.roomId}&rematch=1` }} style={{ flexShrink: 0, padding: '10px 18px', background: 'linear-gradient(135deg, #1D9E75, #0F6E56)', color: 'white', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+                    Αποδοχή
+                  </button>
+                </div>
+              )}
               <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
                 <button onClick={startRematch} disabled={rematchSent} style={{ flex: 1, padding: '13px', background: rematchSent ? c.card : 'linear-gradient(135deg, #1D9E75, #0F6E56)', color: rematchSent ? c.textSub : 'white', border: rematchSent ? `1px solid ${c.cardBorder}` : 'none', borderRadius: 12, fontSize: 15, fontWeight: 800, cursor: rematchSent ? 'default' : 'pointer', fontFamily: 'inherit' }}>
                   {rematchSent ? '✓ Αποστάλθηκε!' : '⚔️ Rematch'}
