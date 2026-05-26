@@ -8,13 +8,21 @@ const ThemeContext = createContext({
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [dark, setDark] = useState(false)
+  const [ready, setReady] = useState(false)
 
+  // Step 1: read localStorage and batch both updates in one render
   useEffect(() => {
     const saved = localStorage.getItem('panhelquiz-theme')
     if (saved === 'dark') setDark(true)
-    // Make page visible after theme is applied — prevents light/dark flash on navigation
-    document.documentElement.style.visibility = 'visible'
+    setReady(true) // React 18 batches this with setDark → single re-render
   }, [])
+
+  // Step 2: runs AFTER the re-render with the correct dark value
+  useEffect(() => {
+    if (ready) {
+      document.documentElement.style.visibility = 'visible'
+    }
+  }, [ready, dark])
 
   const toggleDark = () => {
     setDark(prev => {
