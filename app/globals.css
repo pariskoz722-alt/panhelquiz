@@ -26,6 +26,3 @@ body {
   transition: background 0.25s ease;
 }
 
-html.dark-init body {
-  background: #0A0E14;
-}

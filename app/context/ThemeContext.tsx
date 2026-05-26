@@ -12,6 +12,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const saved = localStorage.getItem('panhelquiz-theme')
     if (saved === 'dark') setDark(true)
+    // Make page visible after theme is applied — prevents light/dark flash on navigation
+    document.documentElement.style.visibility = 'visible'
   }, [])
 
   const toggleDark = () => {
