@@ -49,6 +49,7 @@ export default function Game() {
   const isPlayer1Ref = useRef(false)
   const scoreOppRef = useRef(0)          // always-current opponent score (avoids stale closure)
   const gameChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
+  const rematchBroadcastRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
   const { dark, toggleDark } = useTheme()
   const { addToast } = useToast()
@@ -149,19 +150,19 @@ export default function Game() {
     }
   }
 
-  // Listen for incoming rematch notification on results screen
+  // Broadcast channel for rematch offers — both players join when results appear.
+  // No database write = no RLS concerns. Instant delivery.
   useEffect(() => {
-    if (phase !== 'results' || !myProfileRef.current) return
+    if (phase !== 'results' || !currentRoomRef.current) return
     const ch = supabase
-      .channel(`rematch-in-${myProfileRef.current.id}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${myProfileRef.current.id}` }, (payload) => {
-        const n = payload.new as any
-        if (n.type === 'rematch' && n.data?.room_id) {
-          setRematchIncoming({ roomId: n.data.room_id, from: oppProfileRef.current?.username || 'Αντίπαλος' })
-        }
+      .channel(`rematch-offer-${currentRoomRef.current.id}`)
+      .on('broadcast', { event: 'rematch_offer' }, (payload) => {
+        const { room_id } = payload.payload || {}
+        if (room_id) setRematchIncoming({ roomId: room_id, from: oppProfileRef.current?.username || 'Αντίπαλος' })
       })
       .subscribe()
-    return () => { supabase.removeChannel(ch) }
+    rematchBroadcastRef.current = ch
+    return () => { supabase.removeChannel(ch); rematchBroadcastRef.current = null }
   }, [phase])
 
   // Chat realtime subscription
@@ -314,12 +315,14 @@ export default function Game() {
       .insert({ player1_id: me.id, player2_id: opp.id, subject: room.subject, mode: room.mode || 'casual', status: 'ready' })
       .select().single()
     if (!newRoom) { setRematchSent(false); return }
-    await supabase.from('notifications').insert({
-      user_id: opp.id, type: 'rematch',
-      title: `⚔️ Rematch από ${me.username}!`,
-      message: `Πάτησε εδώ για να παίξεις → ${subjects_name_map[room.subject] || room.subject}`,
-      data: { room_id: newRoom.id },
-    })
+    // Broadcast to opponent via Realtime channel — no RLS, instant, no DB write needed
+    if (rematchBroadcastRef.current) {
+      await rematchBroadcastRef.current.send({
+        type: 'broadcast',
+        event: 'rematch_offer',
+        payload: { room_id: newRoom.id },
+      })
+    }
     window.location.href = `/game?room=${newRoom.id}&rematch=1`
   }
 
